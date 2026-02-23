@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { route } from '@/lib/routes';
 import { ref } from 'vue';
+import { useTranslations } from '@/composables/useTranslations';
+
+const { t } = useTranslations();
 
 interface Settings {
     id: number;
@@ -59,7 +62,7 @@ const generalForm = useForm({
     meta_keywords: props.settings.meta_keywords || '',
     logo: props.settings.logo || '',
     favicon: props.settings.favicon || '',
-    global_currency: props.settings.global_currency || 'USD',
+    global_currency: props.settings.global_currency || 'KZT',
     default_language: props.settings.default_language || 'ru',
 });
 
@@ -113,43 +116,38 @@ const submitWhatsApp = () => {
 </script>
 
 <template>
-    <Head title="Настройки" />
+    <Head :title="t('settings.title', 'Настройки')" />
 
     <AppLayout>
         <div class="flex h-full flex-1 flex-col gap-6 p-6">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight">Настройки</h1>
+                <h1 class="text-3xl font-bold tracking-tight">{{ t('settings.title', 'Настройки') }}</h1>
                 <p class="text-muted-foreground">
-                    Управление настройками платформы
+                    {{ t('settings.description', 'Управление настройками платформы') }}
                 </p>
             </div>
 
             <Tabs default-value="general" class="w-full">
                 <TabsList class="grid w-full grid-cols-4">
-                    <TabsTrigger value="general">Общие</TabsTrigger>
-                    <TabsTrigger value="payment">Платежи</TabsTrigger>
-                    <TabsTrigger value="email">Email</TabsTrigger>
-                    <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+                    <TabsTrigger value="general">{{ t('settings.tabs.general', 'Общие') }}</TabsTrigger>
+                    <TabsTrigger value="payment">{{ t('settings.tabs.payment', 'Платежи') }}</TabsTrigger>
+                    <TabsTrigger value="email">{{ t('settings.tabs.email', 'Email') }}</TabsTrigger>
+                    <TabsTrigger value="whatsapp">{{ t('settings.tabs.whatsapp', 'WhatsApp') }}</TabsTrigger>
                 </TabsList>
 
                 <!-- General Settings -->
                 <TabsContent value="general">
                     <Card>
                         <form @submit.prevent="submitGeneral">
-                            <CardHeader>
-                                <CardTitle>Общие настройки</CardTitle>
-                                <CardDescription>
-                                    Основные настройки проекта, SEO и локализация
-                                </CardDescription>
-                            </CardHeader>
+                            
                             <CardContent class="space-y-4">
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="project_name">Название проекта</Label>
+                                        <Label for="project_name">{{ t('settings.general.project_name', 'Название проекта') }}</Label>
                                         <Input
                                             id="project_name"
                                             v-model="generalForm.project_name"
-                                            placeholder="Моя платформа"
+                                            :placeholder="t('settings.general.project_name_placeholder', 'Моя платформа')"
                                         />
                                         <p v-if="generalForm.errors.project_name" class="text-sm text-destructive">
                                             {{ generalForm.errors.project_name }}
@@ -157,7 +155,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="global_currency">Глобальная валюта</Label>
+                                        <Label for="global_currency">{{ t('settings.general.global_currency', 'Глобальная валюта') }}</Label>
                                         <Select v-model="generalForm.global_currency">
                                             <SelectTrigger id="global_currency">
                                                 <SelectValue />
@@ -172,18 +170,18 @@ const submitWhatsApp = () => {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="project_description">Описание проекта</Label>
+                                    <Label for="project_description">{{ t('settings.general.project_description', 'Описание проекта') }}</Label>
                                     <Textarea
                                         id="project_description"
                                         v-model="generalForm.project_description"
-                                        placeholder="Описание вашей платформы..."
+                                        :placeholder="t('settings.general.project_description_placeholder', 'Описание вашей платформы...')"
                                         rows="3"
                                     />
                                 </div>
 
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="logo">Логотип (URL)</Label>
+                                        <Label for="logo">{{ t('settings.general.logo', 'Логотип (URL)') }}</Label>
                                         <Input
                                             id="logo"
                                             v-model="generalForm.logo"
@@ -192,7 +190,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="favicon">Фавикон (URL)</Label>
+                                        <Label for="favicon">{{ t('settings.general.favicon', 'Фавикон (URL)') }}</Label>
                                         <Input
                                             id="favicon"
                                             v-model="generalForm.favicon"
@@ -202,49 +200,49 @@ const submitWhatsApp = () => {
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="meta_title">Meta Title</Label>
+                                    <Label for="meta_title">{{ t('settings.general.meta_title', 'Meta Title') }}</Label>
                                     <Input
                                         id="meta_title"
                                         v-model="generalForm.meta_title"
-                                        placeholder="Заголовок для SEO"
+                                        :placeholder="t('settings.general.meta_title_placeholder', 'Заголовок для SEO')"
                                     />
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="meta_description">Meta Description</Label>
+                                    <Label for="meta_description">{{ t('settings.general.meta_description', 'Meta Description') }}</Label>
                                     <Textarea
                                         id="meta_description"
                                         v-model="generalForm.meta_description"
-                                        placeholder="Описание для SEO"
+                                        :placeholder="t('settings.general.meta_description_placeholder', 'Описание для SEO')"
                                         rows="2"
                                     />
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="meta_keywords">Meta Keywords</Label>
+                                    <Label for="meta_keywords">{{ t('settings.general.meta_keywords', 'Meta Keywords') }}</Label>
                                     <Input
                                         id="meta_keywords"
                                         v-model="generalForm.meta_keywords"
-                                        placeholder="ключевое, слово, другое"
+                                        :placeholder="t('settings.general.meta_keywords_placeholder', 'ключевое, слово, другое')"
                                     />
                                 </div>
 
                                 <div class="space-y-2">
-                                    <Label for="default_language">Основной язык</Label>
+                                    <Label for="default_language">{{ t('settings.general.default_language', 'Основной язык') }}</Label>
                                     <Select v-model="generalForm.default_language">
                                         <SelectTrigger id="default_language">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="ru">Русский</SelectItem>
-                                            <SelectItem value="en">English</SelectItem>
+                                            <SelectItem value="ru">{{ t('settings.general.language_ru', 'Русский') }}</SelectItem>
+                                            <SelectItem value="en">{{ t('settings.general.language_en', 'English') }}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </CardContent>
                             <CardFooter>
                                 <Button type="submit" :disabled="generalForm.processing">
-                                    {{ generalForm.processing ? 'Сохранение...' : 'Сохранить' }}
+                                    {{ generalForm.processing ? t('settings.saving', 'Сохранение...') : t('settings.save', 'Сохранить') }}
                                 </Button>
                             </CardFooter>
                         </form>
@@ -256,9 +254,9 @@ const submitWhatsApp = () => {
                     <Card>
                         <form @submit.prevent="submitPayment">
                             <CardHeader>
-                                <CardTitle>Настройки платежей</CardTitle>
+                                <CardTitle>{{ t('settings.payment.title', 'Настройки платежей') }}</CardTitle>
                                 <CardDescription>
-                                    Настройки банковских переводов
+                                    {{ t('settings.payment.description', 'Настройки банковских переводов') }}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent class="space-y-4">
@@ -268,23 +266,23 @@ const submitWhatsApp = () => {
                                         v-model:checked="paymentForm.bank_transfer_enabled"
                                     />
                                     <Label for="bank_transfer_enabled" class="cursor-pointer">
-                                        Включить банковский перевод
+                                        {{ t('settings.payment.enable_bank_transfer', 'Включить банковский перевод') }}
                                     </Label>
                                 </div>
 
                                 <div class="space-y-4">
                                     <div class="space-y-2">
-                                        <Label for="bank_name">Название банка</Label>
+                                        <Label for="bank_name">{{ t('settings.payment.bank_name', 'Название банка') }}</Label>
                                         <Input
                                             id="bank_name"
                                             v-model="paymentForm.bank_name"
-                                            placeholder="Название банка"
+                                            :placeholder="t('settings.payment.bank_name_placeholder', 'Название банка')"
                                         />
                                     </div>
 
                                     <div class="grid gap-4 md:grid-cols-2">
                                         <div class="space-y-2">
-                                            <Label for="bank_account">Номер счета</Label>
+                                            <Label for="bank_account">{{ t('settings.payment.bank_account', 'Номер счета') }}</Label>
                                             <Input
                                                 id="bank_account"
                                                 v-model="paymentForm.bank_account"
@@ -293,7 +291,7 @@ const submitWhatsApp = () => {
                                         </div>
 
                                         <div class="space-y-2">
-                                            <Label for="bank_swift">SWIFT код</Label>
+                                            <Label for="bank_swift">{{ t('settings.payment.bank_swift', 'SWIFT код') }}</Label>
                                             <Input
                                                 id="bank_swift"
                                                 v-model="paymentForm.bank_swift"
@@ -303,7 +301,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="bank_iban">IBAN</Label>
+                                        <Label for="bank_iban">{{ t('settings.payment.bank_iban', 'IBAN') }}</Label>
                                         <Input
                                             id="bank_iban"
                                             v-model="paymentForm.bank_iban"
@@ -312,11 +310,11 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="bank_instructions">Инструкции для клиентов</Label>
+                                        <Label for="bank_instructions">{{ t('settings.payment.bank_instructions', 'Инструкции для клиентов') }}</Label>
                                         <Textarea
                                             id="bank_instructions"
                                             v-model="paymentForm.bank_instructions"
-                                            placeholder="Инструкции по оплате..."
+                                            :placeholder="t('settings.payment.bank_instructions_placeholder', 'Инструкции по оплате...')"
                                             rows="4"
                                         />
                                     </div>
@@ -324,7 +322,7 @@ const submitWhatsApp = () => {
                             </CardContent>
                             <CardFooter>
                                 <Button type="submit" :disabled="paymentForm.processing">
-                                    {{ paymentForm.processing ? 'Сохранение...' : 'Сохранить' }}
+                                    {{ paymentForm.processing ? t('settings.saving', 'Сохранение...') : t('settings.save', 'Сохранить') }}
                                 </Button>
                             </CardFooter>
                         </form>
@@ -336,15 +334,15 @@ const submitWhatsApp = () => {
                     <Card>
                         <form @submit.prevent="submitEmail">
                             <CardHeader>
-                                <CardTitle>Настройки Email (SMTP)</CardTitle>
+                                <CardTitle>{{ t('settings.email.title', 'Настройки Email (SMTP)') }}</CardTitle>
                                 <CardDescription>
-                                    Настройки SMTP сервера для отправки писем
+                                    {{ t('settings.email.description', 'Настройки SMTP сервера для отправки писем') }}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent class="space-y-4">
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="smtp_host">SMTP Host</Label>
+                                        <Label for="smtp_host">{{ t('settings.email.smtp_host', 'SMTP Host') }}</Label>
                                         <Input
                                             id="smtp_host"
                                             v-model="emailForm.smtp_host"
@@ -353,7 +351,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="smtp_port">SMTP Port</Label>
+                                        <Label for="smtp_port">{{ t('settings.email.smtp_port', 'SMTP Port') }}</Label>
                                         <Input
                                             id="smtp_port"
                                             v-model.number="emailForm.smtp_port"
@@ -365,7 +363,7 @@ const submitWhatsApp = () => {
 
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="smtp_username">SMTP Username</Label>
+                                        <Label for="smtp_username">{{ t('settings.email.smtp_username', 'SMTP Username') }}</Label>
                                         <Input
                                             id="smtp_username"
                                             v-model="emailForm.smtp_username"
@@ -374,7 +372,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="smtp_password">SMTP Password</Label>
+                                        <Label for="smtp_password">{{ t('settings.email.smtp_password', 'SMTP Password') }}</Label>
                                         <Input
                                             id="smtp_password"
                                             v-model="emailForm.smtp_password"
@@ -386,7 +384,7 @@ const submitWhatsApp = () => {
 
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="smtp_encryption">Шифрование</Label>
+                                        <Label for="smtp_encryption">{{ t('settings.email.smtp_encryption', 'Шифрование') }}</Label>
                                         <Select v-model="emailForm.smtp_encryption">
                                             <SelectTrigger id="smtp_encryption">
                                                 <SelectValue />
@@ -394,7 +392,7 @@ const submitWhatsApp = () => {
                                             <SelectContent>
                                                 <SelectItem value="tls">TLS</SelectItem>
                                                 <SelectItem value="ssl">SSL</SelectItem>
-                                                <SelectItem value="">Нет</SelectItem>
+                                                <SelectItem value="">{{ t('settings.email.no_encryption', 'Нет') }}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -402,7 +400,7 @@ const submitWhatsApp = () => {
 
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
-                                        <Label for="smtp_from_address">От (Email)</Label>
+                                        <Label for="smtp_from_address">{{ t('settings.email.smtp_from_address', 'От (Email)') }}</Label>
                                         <Input
                                             id="smtp_from_address"
                                             v-model="emailForm.smtp_from_address"
@@ -412,18 +410,18 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="smtp_from_name">От (Имя)</Label>
+                                        <Label for="smtp_from_name">{{ t('settings.email.smtp_from_name', 'От (Имя)') }}</Label>
                                         <Input
                                             id="smtp_from_name"
                                             v-model="emailForm.smtp_from_name"
-                                            placeholder="Моя платформа"
+                                            :placeholder="t('settings.email.smtp_from_name_placeholder', 'Моя платформа')"
                                         />
                                     </div>
                                 </div>
                             </CardContent>
                             <CardFooter>
                                 <Button type="submit" :disabled="emailForm.processing">
-                                    {{ emailForm.processing ? 'Сохранение...' : 'Сохранить' }}
+                                    {{ emailForm.processing ? t('settings.saving', 'Сохранение...') : t('settings.save', 'Сохранить') }}
                                 </Button>
                             </CardFooter>
                         </form>
@@ -435,9 +433,9 @@ const submitWhatsApp = () => {
                     <Card>
                         <form @submit.prevent="submitWhatsApp">
                             <CardHeader>
-                                <CardTitle>Настройки WhatsApp Business API</CardTitle>
+                                <CardTitle>{{ t('settings.whatsapp.title', 'Настройки WhatsApp Business API') }}</CardTitle>
                                 <CardDescription>
-                                    Настройки интеграции с WhatsApp Business API
+                                    {{ t('settings.whatsapp.description', 'Настройки интеграции с WhatsApp Business API') }}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent class="space-y-4">
@@ -447,14 +445,14 @@ const submitWhatsApp = () => {
                                         v-model:checked="whatsappForm.whatsapp_enabled"
                                     />
                                     <Label for="whatsapp_enabled" class="cursor-pointer">
-                                        Включить WhatsApp Business API
+                                        {{ t('settings.whatsapp.enable', 'Включить WhatsApp Business API') }}
                                     </Label>
                                 </div>
 
                                 <div class="space-y-4">
                                     <div class="grid gap-4 md:grid-cols-2">
                                         <div class="space-y-2">
-                                            <Label for="whatsapp_api_key">API Key</Label>
+                                            <Label for="whatsapp_api_key">{{ t('settings.whatsapp.api_key', 'API Key') }}</Label>
                                             <Input
                                                 id="whatsapp_api_key"
                                                 v-model="whatsappForm.whatsapp_api_key"
@@ -463,7 +461,7 @@ const submitWhatsApp = () => {
                                         </div>
 
                                         <div class="space-y-2">
-                                            <Label for="whatsapp_api_secret">API Secret</Label>
+                                            <Label for="whatsapp_api_secret">{{ t('settings.whatsapp.api_secret', 'API Secret') }}</Label>
                                             <Input
                                                 id="whatsapp_api_secret"
                                                 v-model="whatsappForm.whatsapp_api_secret"
@@ -475,7 +473,7 @@ const submitWhatsApp = () => {
 
                                     <div class="grid gap-4 md:grid-cols-2">
                                         <div class="space-y-2">
-                                            <Label for="whatsapp_phone_number">Номер телефона</Label>
+                                            <Label for="whatsapp_phone_number">{{ t('settings.whatsapp.phone_number', 'Номер телефона') }}</Label>
                                             <Input
                                                 id="whatsapp_phone_number"
                                                 v-model="whatsappForm.whatsapp_phone_number"
@@ -484,7 +482,7 @@ const submitWhatsApp = () => {
                                         </div>
 
                                         <div class="space-y-2">
-                                            <Label for="whatsapp_business_id">Business ID</Label>
+                                            <Label for="whatsapp_business_id">{{ t('settings.whatsapp.business_id', 'Business ID') }}</Label>
                                             <Input
                                                 id="whatsapp_business_id"
                                                 v-model="whatsappForm.whatsapp_business_id"
@@ -494,7 +492,7 @@ const submitWhatsApp = () => {
                                     </div>
 
                                     <div class="space-y-2">
-                                        <Label for="whatsapp_webhook_url">Webhook URL</Label>
+                                        <Label for="whatsapp_webhook_url">{{ t('settings.whatsapp.webhook_url', 'Webhook URL') }}</Label>
                                         <Input
                                             id="whatsapp_webhook_url"
                                             v-model="whatsappForm.whatsapp_webhook_url"
@@ -505,7 +503,7 @@ const submitWhatsApp = () => {
                             </CardContent>
                             <CardFooter>
                                 <Button type="submit" :disabled="whatsappForm.processing">
-                                    {{ whatsappForm.processing ? 'Сохранение...' : 'Сохранить' }}
+                                    {{ whatsappForm.processing ? t('settings.saving', 'Сохранение...') : t('settings.save', 'Сохранить') }}
                                 </Button>
                             </CardFooter>
                         </form>
