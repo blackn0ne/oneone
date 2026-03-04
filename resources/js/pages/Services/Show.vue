@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import type { Service } from '@/types';
 import { route } from '@/lib/routes';
 
@@ -12,6 +13,12 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const handleDelete = () => {
+    if (confirm('Вы уверены, что хотите удалить эту услугу?')) {
+        router.delete(route('services.destroy', props.service.id));
+    }
+};
 </script>
 
 <template>
@@ -26,9 +33,19 @@ const props = defineProps<Props>();
                         Детальная информация об услуге
                     </p>
                 </div>
-                <Link :href="route('services.index')">
-                    <Button variant="outline">Назад к списку</Button>
-                </Link>
+                <div class="flex items-center gap-2">
+                    <Link :href="route('services.edit', service.id)">
+                        <Button variant="outline" size="icon" class="rounded-full">
+                            <Pencil class="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <Button variant="outline" size="icon" class="rounded-full" @click="handleDelete">
+                        <Trash2 class="h-4 w-4" />
+                    </Button>
+                    <Link :href="route('services.index')">
+                        <Button variant="outline">Назад к списку</Button>
+                    </Link>
+                </div>
             </div>
 
             <div class="grid gap-6 md:grid-cols-2">
@@ -81,16 +98,25 @@ const props = defineProps<Props>();
                     <CardContent class="space-y-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <p class="text-sm font-medium text-muted-foreground">Буфер до</p>
-                                <p>{{ service.buffer_time_before }} мин</p>
+                                <p class="text-sm font-medium text-muted-foreground">Буфер до начала</p>
+                                <p class="text-base">{{ service.buffer_time_before }} мин</p>
+                                <p class="text-xs text-muted-foreground mt-1">
+                                    Время перед началом услуги
+                                </p>
                             </div>
                             <div>
-                                <p class="text-sm font-medium text-muted-foreground">Буфер после</p>
-                                <p>{{ service.buffer_time_after }} мин</p>
+                                <p class="text-sm font-medium text-muted-foreground">Буфер после окончания</p>
+                                <p class="text-base">{{ service.buffer_time_after }} мин</p>
+                                <p class="text-xs text-muted-foreground mt-1">
+                                    Время после окончания услуги
+                                </p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Время подготовки</p>
-                                <p>{{ service.prepare_time }} мин</p>
+                                <p class="text-base">{{ service.prepare_time }} мин</p>
+                                <p class="text-xs text-muted-foreground mt-1">
+                                    Время подготовки сотрудника
+                                </p>
                             </div>
                             <div v-if="service.max_participants">
                                 <p class="text-sm font-medium text-muted-foreground">Макс. участников</p>

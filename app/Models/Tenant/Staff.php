@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * Модель сотрудника
@@ -26,6 +27,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Staff extends Model
 {
+    use HasRoles;
+
+    /**
+     * Используем tenant-подключение, чтобы все записи создавались в базе tenant,
+     * а не в центральной базе данных.
+     */
+    protected $connection = 'tenant';
+
     protected $fillable = [
         'user_id',
         'name',

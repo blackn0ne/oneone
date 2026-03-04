@@ -22,11 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // Регистрируем middleware для ролей
+        // Регистрируем middleware для ролей и tenancy
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'super_admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'tenant.session' => \App\Http\Middleware\InitializeTenancyBySession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

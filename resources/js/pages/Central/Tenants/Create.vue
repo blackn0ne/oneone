@@ -102,7 +102,6 @@ const submit = () => {
                                         <SelectValue placeholder="Выберите тариф" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Без тарифа</SelectItem>
                                         <SelectItem
                                             v-for="plan in plans"
                                             :key="plan.id"

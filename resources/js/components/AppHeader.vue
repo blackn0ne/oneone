@@ -47,7 +47,6 @@ import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import type { BreadcrumbItem, NavItem } from '@/types';
-import { dashboard } from '@/routes';
 import { route } from '@/lib/routes';
 
 type Props = {
@@ -59,54 +58,19 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const page = usePage();
-const auth = computed(() => page.props.auth);
-const user = computed(() => page.props.auth.user);
+const auth = computed(() => page.props.auth ?? { user: null });
+const user = computed(() => auth.value.user ?? null);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
 
-// Определяем контекст: центральный или tenant
-const isCentral = computed(() => {
-    const url = page.url;
-    // Если URL начинается с /central - точно центральный контекст
-    if (url.startsWith('/central')) {
-        return true;
-    }
-    // Если пользователь - суперадмин, показываем центральную навигацию
-    if (user.value?.is_super_admin || user.value?.roles?.includes('super_admin')) {
-        return true;
-    }
-    // Иначе - tenant контекст
-    return false;
-});
+// Центральный контекст — только когда путь /central
+const isCentral = computed(() => page.url.startsWith('/central'));
 
 const tenantNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: route('dashboard'),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Бронирования',
-        href: route('bookings.index'),
-        icon: Calendar,
-    },
-    {
-        title: 'Услуги',
-        href: route('services.index'),
-        icon: Briefcase,
-    },
-    {
-        title: 'Сотрудники',
-        href: route('staff.index'),
-        icon: UserCircle,
-    },
-    {
-        title: 'Клиенты',
-        href: route('customers.index'),
-        icon: Users,
-    },
+    // Для tenant-части мы вообще не показываем верхнее меню —
+    // у тенант-страниц будет свой отдельный layout/навигация.
 ];
 
 const centralNavItems: NavItem[] = [
@@ -221,7 +185,7 @@ const rightNavItems: NavItem[] = [
                     </Sheet>
                 </div>
 
-                <Link :href="isCentral ? dashboard() : route('dashboard')" class="flex items-center gap-x-2">
+                <Link :href="isCentral ? route('central.dashboard') : route('dashboard')" class="flex items-center gap-x-2">
                     <AppLogo />
                 </Link>
 

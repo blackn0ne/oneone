@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +18,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import BookingCalendar from '@/components/booking/BookingCalendar.vue';
 import type { Service, Staff, Customer } from '@/types';
-import { ref } from 'vue';
 import { route } from '@/lib/routes';
 
 interface Props {
@@ -37,6 +44,7 @@ const form = useForm({
     notes: '',
 });
 
+const isOpen = ref(true);
 const selectedDate = ref<Date>();
 const selectedTime = ref('');
 
@@ -87,7 +95,18 @@ const updateDateTime = () => {
 const submit = () => {
     form.post(route('bookings.store'), {
         preserveScroll: true,
+        onSuccess: () => {
+            isOpen.value = false;
+            router.visit(route('bookings.index'));
+        },
     });
+};
+
+const handleClose = (open: boolean) => {
+    if (!open) {
+        isOpen.value = false;
+        router.visit(route('bookings.index'));
+    }
 };
 </script>
 
@@ -95,221 +114,213 @@ const submit = () => {
     <Head title="Новое бронирование" />
 
     <AppLayout>
-        <div class="flex h-full flex-1 flex-col gap-6 p-6">
-            <div>
-                <h1 class="text-3xl font-bold tracking-tight">Новое бронирование</h1>
-                <p class="text-muted-foreground">
-                    Создайте новое бронирование для клиента
-                </p>
-            </div>
+        <Sheet :open="isOpen" @update:open="(open) => handleClose(open)">
+            <SheetContent side="right" class="overflow-y-auto">
+                <SheetHeader>
+                    <SheetTitle>Новое бронирование</SheetTitle>
+                    <SheetDescription>
+                        Создайте новое бронирование для клиента
+                    </SheetDescription>
+                </SheetHeader>
 
-            <Card>
-                <form @submit.prevent="submit">
-                    <CardHeader>
-                        <CardTitle>Информация о бронировании</CardTitle>
-                        <CardDescription>
-                            Заполните форму для создания нового бронирования
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <!-- Услуга -->
-                        <div class="space-y-2">
-                            <Label for="service">Услуга *</Label>
-                            <Select
-                                id="service"
-                                :model-value="form.service_id"
-                                @update:model-value="onServiceChange"
-                                required
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Выберите услугу" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="service in services"
-                                        :key="service.id"
-                                        :value="String(service.id)"
-                                    >
-                                        {{ service.name }} - {{ service.price }} ₽
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p v-if="form.errors.service_id" class="text-sm text-destructive">
-                                {{ form.errors.service_id }}
-                            </p>
+                <form @submit.prevent="submit" class="space-y-4 mt-6">
+                    <!-- Услуга -->
+                    <div class="space-y-2">
+                        <Label for="service">Услуга *</Label>
+                        <Select
+                            id="service"
+                            :model-value="form.service_id"
+                            @update:model-value="onServiceChange"
+                            required
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Выберите услугу" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="service in services"
+                                    :key="service.id"
+                                    :value="String(service.id)"
+                                >
+                                    {{ service.name }} - {{ service.price }} ₽
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.service_id" class="text-sm text-destructive">
+                            {{ form.errors.service_id }}
+                        </p>
+                    </div>
+
+                    <!-- Сотрудник -->
+                    <div class="space-y-2">
+                        <Label for="staff">Сотрудник</Label>
+                        <Select
+                            id="staff"
+                            v-model="form.staff_id"
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Выберите сотрудника (опционально)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="staffMember in staff"
+                                    :key="staffMember.id"
+                                    :value="String(staffMember.id)"
+                                >
+                                    {{ staffMember.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <!-- Клиент -->
+                    <div class="space-y-2">
+                        <Label for="customer">Клиент *</Label>
+                        <Select
+                            id="customer"
+                            v-model="form.customer_id"
+                            required
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Выберите клиента" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="customer in customers"
+                                    :key="customer.id"
+                                    :value="String(customer.id)"
+                                >
+                                    {{ customer.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.customer_id" class="text-sm text-destructive">
+                            {{ form.errors.customer_id }}
+                        </p>
+                    </div>
+
+                    <!-- Дата -->
+                    <div class="space-y-2">
+                        <Label>Дата *</Label>
+                        <BookingCalendar v-model:date="selectedDate" @update:date="onDateChange" />
+                        <p v-if="form.errors.start_time" class="text-sm text-destructive">
+                            {{ form.errors.start_time }}
+                        </p>
+                    </div>
+
+                    <!-- Время -->
+                    <div class="space-y-2">
+                        <Label for="time">Время *</Label>
+                        <Select
+                            id="time"
+                            v-model="selectedTime"
+                            @update:model-value="onTimeChange"
+                            required
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Выберите время" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="slot in timeSlots"
+                                    :key="slot"
+                                    :value="slot"
+                                >
+                                    {{ slot }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.start_time" class="text-sm text-destructive">
+                            {{ form.errors.start_time }}
+                        </p>
+                    </div>
+
+                    <!-- Длительность -->
+                    <div v-if="selectedService?.allow_custom_duration" class="space-y-2">
+                        <Label for="duration">Длительность (минуты)</Label>
+                        <Input
+                            id="duration"
+                            v-model.number="form.duration"
+                            type="number"
+                            min="1"
+                            @input="updateDateTime"
+                        />
+                    </div>
+
+                    <!-- Участники -->
+                    <div v-if="selectedService?.max_participants" class="space-y-2">
+                        <div class="flex items-center space-x-2">
+                            <Checkbox id="is_group" v-model:checked="form.is_group" />
+                            <Label for="is_group" class="cursor-pointer">
+                                Групповое бронирование
+                            </Label>
                         </div>
-
-                        <!-- Сотрудник -->
-                        <div class="space-y-2">
-                            <Label for="staff">Сотрудник</Label>
-                            <Select
-                                id="staff"
-                                v-model="form.staff_id"
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Выберите сотрудника (опционально)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">Не назначен</SelectItem>
-                                    <SelectItem
-                                        v-for="staffMember in staff"
-                                        :key="staffMember.id"
-                                        :value="String(staffMember.id)"
-                                    >
-                                        {{ staffMember.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <!-- Клиент -->
-                        <div class="space-y-2">
-                            <Label for="customer">Клиент *</Label>
-                            <Select
-                                id="customer"
-                                v-model="form.customer_id"
-                                required
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Выберите клиента" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="customer in customers"
-                                        :key="customer.id"
-                                        :value="String(customer.id)"
-                                    >
-                                        {{ customer.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p v-if="form.errors.customer_id" class="text-sm text-destructive">
-                                {{ form.errors.customer_id }}
-                            </p>
-                        </div>
-
-                        <!-- Дата -->
-                        <div class="space-y-2">
-                            <Label>Дата *</Label>
-                            <BookingCalendar v-model:date="selectedDate" @update:date="onDateChange" />
-                            <p v-if="form.errors.start_time" class="text-sm text-destructive">
-                                {{ form.errors.start_time }}
-                            </p>
-                        </div>
-
-                        <!-- Время -->
-                        <div class="space-y-2">
-                            <Label for="time">Время *</Label>
-                            <Select
-                                id="time"
-                                v-model="selectedTime"
-                                @update:model-value="onTimeChange"
-                                required
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Выберите время" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="slot in timeSlots"
-                                        :key="slot"
-                                        :value="slot"
-                                    >
-                                        {{ slot }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p v-if="form.errors.start_time" class="text-sm text-destructive">
-                                {{ form.errors.start_time }}
-                            </p>
-                        </div>
-
-                        <!-- Длительность -->
-                        <div v-if="selectedService?.allow_custom_duration" class="space-y-2">
-                            <Label for="duration">Длительность (минуты)</Label>
+                        <div v-if="form.is_group" class="space-y-2">
+                            <Label for="participants">Количество участников</Label>
                             <Input
-                                id="duration"
-                                v-model.number="form.duration"
+                                id="participants"
+                                v-model.number="form.participants_count"
                                 type="number"
-                                min="1"
-                                @input="updateDateTime"
+                                :min="1"
+                                :max="selectedService?.max_participants"
                             />
                         </div>
+                    </div>
 
-                        <!-- Участники -->
-                        <div v-if="selectedService?.max_participants" class="space-y-2">
-                            <div class="flex items-center space-x-2">
-                                <Checkbox id="is_group" v-model:checked="form.is_group" />
-                                <Label for="is_group" class="cursor-pointer">
-                                    Групповое бронирование
-                                </Label>
+                    <!-- Повторяющееся бронирование -->
+                    <div class="space-y-2">
+                        <div class="flex items-center space-x-2">
+                            <Checkbox id="recurring" v-model:checked="form.is_recurring" />
+                            <Label for="recurring" class="cursor-pointer">
+                                Повторяющееся бронирование
+                            </Label>
+                        </div>
+                        <div v-if="form.is_recurring" class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label for="recurring_pattern">Периодичность</Label>
+                                <Select v-model="form.recurring_pattern">
+                                    <SelectTrigger id="recurring_pattern">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="daily">Ежедневно</SelectItem>
+                                        <SelectItem value="weekly">Еженедельно</SelectItem>
+                                        <SelectItem value="monthly">Ежемесячно</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div v-if="form.is_group" class="space-y-2">
-                                <Label for="participants">Количество участников</Label>
+                            <div class="space-y-2">
+                                <Label for="recurring_end_date">Дата окончания</Label>
                                 <Input
-                                    id="participants"
-                                    v-model.number="form.participants_count"
-                                    type="number"
-                                    :min="1"
-                                    :max="selectedService?.max_participants"
+                                    id="recurring_end_date"
+                                    v-model="form.recurring_end_date"
+                                    type="date"
                                 />
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Повторяющееся бронирование -->
-                        <div class="space-y-2">
-                            <div class="flex items-center space-x-2">
-                                <Checkbox id="recurring" v-model:checked="form.is_recurring" />
-                                <Label for="recurring" class="cursor-pointer">
-                                    Повторяющееся бронирование
-                                </Label>
-                            </div>
-                            <div v-if="form.is_recurring" class="grid gap-4 md:grid-cols-2">
-                                <div class="space-y-2">
-                                    <Label for="recurring_pattern">Периодичность</Label>
-                                    <Select v-model="form.recurring_pattern">
-                                        <SelectTrigger id="recurring_pattern">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="daily">Ежедневно</SelectItem>
-                                            <SelectItem value="weekly">Еженедельно</SelectItem>
-                                            <SelectItem value="monthly">Ежемесячно</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div class="space-y-2">
-                                    <Label for="recurring_end_date">Дата окончания</Label>
-                                    <Input
-                                        id="recurring_end_date"
-                                        v-model="form.recurring_end_date"
-                                        type="date"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Примечания -->
+                    <div class="space-y-2">
+                        <Label for="notes">Примечания</Label>
+                        <Textarea
+                            id="notes"
+                            v-model="form.notes"
+                            placeholder="Дополнительная информация..."
+                            rows="3"
+                        />
+                    </div>
 
-                        <!-- Примечания -->
-                        <div class="space-y-2">
-                            <Label for="notes">Примечания</Label>
-                            <Textarea
-                                id="notes"
-                                v-model="form.notes"
-                                placeholder="Дополнительная информация..."
-                                rows="3"
-                            />
-                        </div>
-                    </CardContent>
-                    <CardFooter class="flex justify-end gap-2">
-                        <Button type="button" variant="outline" @click="$inertia.visit(route('bookings.index'))">
+                    <SheetFooter class="gap-2 sm:gap-0">
+                        <Button type="button" variant="outline" @click="handleClose">
                             Отмена
                         </Button>
                         <Button type="submit" :disabled="form.processing">
                             {{ form.processing ? 'Создание...' : 'Создать бронирование' }}
                         </Button>
-                    </CardFooter>
+                    </SheetFooter>
                 </form>
-            </Card>
-        </div>
+            </SheetContent>
+        </Sheet>
     </AppLayout>
 </template>

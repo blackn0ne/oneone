@@ -1,9 +1,19 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import { PlusIcon } from 'lucide-vue-next';
+import CustomerCreateForm from '@/components/Forms/CustomerCreateForm.vue';
 import type { Customer } from '@/types';
 import { route } from '@/lib/routes';
 
@@ -17,6 +27,22 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const isCreateSheetOpen = ref(false);
+
+const openCreateSheet = () => {
+    isCreateSheetOpen.value = true;
+};
+
+const closeCreateSheet = (open: boolean) => {
+    if (!open) {
+        isCreateSheetOpen.value = false;
+    }
+};
+
+const handleSuccess = () => {
+    isCreateSheetOpen.value = false;
+};
 </script>
 
 <template>
@@ -31,6 +57,10 @@ const props = defineProps<Props>();
                         Управляйте клиентами и их информацией
                     </p>
                 </div>
+                <Button @click="openCreateSheet">
+                    <PlusIcon class="mr-2 h-4 w-4" />
+                    Добавить клиента
+                </Button>
             </div>
 
             <Card>
@@ -70,6 +100,25 @@ const props = defineProps<Props>();
                     </Table>
                 </CardContent>
             </Card>
+
+            <!-- Sheet для создания клиента -->
+            <Sheet :open="isCreateSheetOpen" @update:open="closeCreateSheet">
+                <SheetContent side="right" class="overflow-y-auto">
+                    <SheetHeader>
+                        <SheetTitle>Новый клиент</SheetTitle>
+                        <SheetDescription>
+                            Создайте нового клиента в системе
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div class="mt-6">
+                        <CustomerCreateForm
+                            :on-success="handleSuccess"
+                            :on-cancel="() => closeCreateSheet(false)"
+                        />
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     </AppLayout>
 </template>

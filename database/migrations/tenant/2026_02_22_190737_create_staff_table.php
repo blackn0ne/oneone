@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('staff', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            // user_id ссылается на users в центральной базе, поэтому foreign key не нужен
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->string('name');
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
@@ -28,6 +29,7 @@ return new class extends Migration
 
             $table->index('is_active');
             $table->index('email');
+            $table->index('user_id');
         });
     }
 

@@ -21,8 +21,11 @@ class ServiceController extends Controller
             ->latest()
             ->paginate(15);
 
+        $locations = Location::where('is_active', true)->get();
+
         return Inertia::render('Services/Index', [
             'services' => $services,
+            'locations' => $locations,
         ]);
     }
 
@@ -62,13 +65,15 @@ class ServiceController extends Controller
         $service = Service::create($validated);
 
         return redirect()
-            ->route('services.show', $service)
+            ->route('services.index')
             ->with('success', 'Услуга успешно создана!');
     }
 
-    public function show(Service $service): Response
+    public function show(Request $request, $id): Response
     {
-        $service->load(['location', 'staff', 'bookings']);
+        // Используем явный поиск по ID, так как route model binding может не работать
+        // из-за того, что модель находится в tenant БД
+        $service = Service::with(['location', 'staff', 'bookings'])->findOrFail($id);
 
         return Inertia::render('Services/Show', [
             'service' => $service,
@@ -76,14 +81,34 @@ class ServiceController extends Controller
     }
 
     /**
+     * Показать форму редактирования услуги
+     *
+     * @param Request $request
+     * @param int $id
+     * @return Response
+     */
+    public function edit(Request $request, $id): Response
+    {
+        $service = Service::findOrFail($id);
+        $locations = Location::where('is_active', true)->get();
+
+        return Inertia::render('Services/Edit', [
+            'service' => $service,
+            'locations' => $locations,
+        ]);
+    }
+
+    /**
      * Обновить услугу
      *
      * @param Request $request
-     * @param Service $service
+     * @param int $id
      * @return RedirectResponse
      */
-    public function update(Request $request, Service $service): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse
     {
+        $service = Service::findOrFail($id);
+
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -100,21 +125,27 @@ class ServiceController extends Controller
             'allow_recurring' => ['boolean'],
         ]);
 
+        // Обработка location_id: если пустая строка, устанавливаем null
+        if (isset($validated['location_id']) && $validated['location_id'] === '') {
+            $validated['location_id'] = null;
+        }
+
         $service->update($validated);
 
         return redirect()
-            ->route('services.show', $service)
+            ->route('services.index')
             ->with('success', 'Услуга обновлена!');
     }
 
     /**
      * Удалить услугу
      *
-     * @param Service $service
+     * @param int $id
      * @return RedirectResponse
      */
-    public function destroy(Service $service): RedirectResponse
+    public function destroy($id): RedirectResponse
     {
+        $service = Service::findOrFail($id);
         $service->delete();
 
         return redirect()

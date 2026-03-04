@@ -3,41 +3,19 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
-use App\Http\Controllers\Tenant\DashboardController;
-use App\Http\Controllers\Tenant\BookingController;
-use App\Http\Controllers\Tenant\ServiceController;
-use App\Http\Controllers\Tenant\StaffController;
-use App\Http\Controllers\Tenant\CustomerController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
+use App\Http\Controllers\Tenant\LandingController;
 
 /*
 |--------------------------------------------------------------------------
-| Tenant Routes
+| Tenant Routes (path-based)
 |--------------------------------------------------------------------------
 |
-| Here you can register the tenant routes for your application.
-| These routes are loaded by the TenantRouteServiceProvider.
+| /{tenant} — публичный сайт компании (лого, услуги, запись)
+| Панель tenant: /dashboard, /bookings и т.д. — в web.php (tenant из сессии)
 |
 */
 
-Route::middleware([
-    'web',
-    InitializeTenancyByDomain::class,
-    PreventAccessFromCentralDomains::class,
-])->group(function () {
-    // Dashboard
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-
-    // Bookings
-    Route::resource('bookings', BookingController::class);
-
-    // Services
-    Route::resource('services', ServiceController::class);
-
-    // Staff
-    Route::resource('staff', StaffController::class);
-
-    // Customers
-    Route::resource('customers', CustomerController::class);
+Route::middleware(['web', InitializeTenancyByPath::class])->group(function () {
+    Route::get('/{tenant}', [LandingController::class, 'index'])->name('tenant.landing');
 });

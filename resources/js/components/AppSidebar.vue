@@ -9,7 +9,8 @@ import {
     Users, 
     UserCircle,
     Building2,
-    Settings
+    Settings,
+    BarChart3
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -26,25 +27,17 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
-import { dashboard } from '@/routes';
 import { route } from '@/lib/routes';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
 // Определяем контекст: центральный или tenant
+// Центральный контекст - только когда путь начинается с /central
+// Даже суперадмин на домене tenant должен видеть tenant-меню
 const isCentral = computed(() => {
     const url = page.url;
-    // Если URL начинается с /central - точно центральный контекст
-    if (url.startsWith('/central')) {
-        return true;
-    }
-    // Если пользователь - суперадмин, показываем центральную навигацию
-    if (user.value?.is_super_admin || user.value?.roles?.includes('super_admin')) {
-        return true;
-    }
-    // Иначе - tenant контекст
-    return false;
+    return url.startsWith('/central');
 });
 
 // Tenant navigation items
@@ -74,6 +67,16 @@ const tenantNavItems: NavItem[] = [
         href: route('customers.index'),
         icon: Users,
     },
+    {
+        title: 'Отчеты',
+        href: route('reports.index'),
+        icon: BarChart3,
+    },
+    {
+        title: 'Бизнес',
+        href: route('business.index'),
+        icon: Building2,
+    },
 ];
 
 // Central navigation items
@@ -87,6 +90,11 @@ const centralNavItems: NavItem[] = [
         title: 'Tenants',
         href: route('central.tenants.index'),
         icon: Building2,
+    },
+    {
+        title: 'Пользователи',
+        href: route('central.users.index'),
+        icon: Users,
     },
     {
         title: 'Тарифы',
@@ -134,7 +142,7 @@ const footerNavItems: NavItem[] = [
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="isCentral ? dashboard() : route('dashboard')">
+                        <Link :href="isCentral ? route('central.dashboard') : route('dashboard')">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
@@ -147,8 +155,8 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
+            <NavFooter :items="footerNavItems" />
         </SidebarFooter>
     </Sidebar>
     <slot />

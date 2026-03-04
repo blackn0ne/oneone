@@ -26,6 +26,14 @@ class CustomerController extends Controller
     }
 
     /**
+     * Показать форму создания клиента
+     */
+    public function create(Request $request): Response
+    {
+        return Inertia::render('Customers/Create');
+    }
+
+    /**
      * Сохранить нового клиента
      *
      * @param Request $request
@@ -44,13 +52,13 @@ class CustomerController extends Controller
         $customer = Customer::create($validated);
 
         return redirect()
-            ->route('customers.show', $customer)
+            ->route('customers.index')
             ->with('success', 'Клиент успешно создан!');
     }
 
-    public function show(Customer $customer): Response
+    public function show($id): Response
     {
-        $customer->load(['bookings.service', 'bookings.staff']);
+        $customer = Customer::with(['bookings.service', 'bookings.staff'])->findOrFail($id);
 
         return Inertia::render('Customers/Show', [
             'customer' => $customer,
@@ -61,11 +69,13 @@ class CustomerController extends Controller
      * Обновить клиента
      *
      * @param Request $request
-     * @param Customer $customer
+     * @param int $id
      * @return RedirectResponse
      */
-    public function update(Request $request, Customer $customer): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse
     {
+        $customer = Customer::findOrFail($id);
+
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:customers,email,' . $customer->id],
@@ -77,7 +87,7 @@ class CustomerController extends Controller
         $customer->update($validated);
 
         return redirect()
-            ->route('customers.show', $customer)
+            ->route('customers.index')
             ->with('success', 'Клиент обновлен!');
     }
 }

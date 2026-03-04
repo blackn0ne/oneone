@@ -1,12 +1,27 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
+import { PlusIcon } from 'lucide-vue-next';
+import StaffCreateForm from '@/components/Forms/StaffCreateForm.vue';
 import type { Staff } from '@/types';
 import { route } from '@/lib/routes';
+
+interface Permission {
+    id: number;
+    name: string;
+}
 
 interface Props {
     staff: {
@@ -15,9 +30,26 @@ interface Props {
         current_page: number;
         last_page: number;
     };
+    permissions?: Record<string, Permission[]>;
 }
 
 const props = defineProps<Props>();
+
+const isCreateSheetOpen = ref(false);
+
+const openCreateSheet = () => {
+    isCreateSheetOpen.value = true;
+};
+
+const closeCreateSheet = (open: boolean) => {
+    if (!open) {
+        isCreateSheetOpen.value = false;
+    }
+};
+
+const handleSuccess = () => {
+    isCreateSheetOpen.value = false;
+};
 </script>
 
 <template>
@@ -32,6 +64,10 @@ const props = defineProps<Props>();
                         Управляйте сотрудниками и их расписанием
                     </p>
                 </div>
+                <Button @click="openCreateSheet">
+                    <PlusIcon class="mr-2 h-4 w-4" />
+                    Добавить сотрудника
+                </Button>
             </div>
 
             <Card>
@@ -79,6 +115,26 @@ const props = defineProps<Props>();
                     </Table>
                 </CardContent>
             </Card>
+
+            <!-- Sheet для создания сотрудника -->
+            <Sheet :open="isCreateSheetOpen" @update:open="closeCreateSheet">
+                <SheetContent side="right" class="overflow-y-auto">
+                    <SheetHeader>
+                        <SheetTitle>Новый сотрудник</SheetTitle>
+                        <SheetDescription>
+                            Создайте нового сотрудника в системе
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div class="mt-6">
+                        <StaffCreateForm
+                            :permissions="props.permissions || {}"
+                            :on-success="handleSuccess"
+                            :on-cancel="() => closeCreateSheet(false)"
+                        />
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     </AppLayout>
 </template>

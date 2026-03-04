@@ -392,7 +392,6 @@ const submitWhatsApp = () => {
                                             <SelectContent>
                                                 <SelectItem value="tls">TLS</SelectItem>
                                                 <SelectItem value="ssl">SSL</SelectItem>
-                                                <SelectItem value="">{{ t('settings.email.no_encryption', 'Нет') }}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

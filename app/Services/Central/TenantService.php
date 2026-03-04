@@ -4,6 +4,11 @@ namespace App\Services\Central;
 
 use App\Models\Central\Tenant;
 use App\Models\Central\Domain;
+use App\Models\Central\Subscription;
+use App\Models\Central\Plan;
+use App\Enums\SubscriptionStatus;
+use App\Enums\TenantStatus;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Jobs\CreateDatabase;
 use Stancl\Tenancy\Jobs\MigrateDatabase;
@@ -20,14 +25,56 @@ class TenantService
     public function createTenant(array $data): Tenant
     {
         $tenant = Tenant::create($data);
-
+        
         // Создание домена по умолчанию
         $this->createDefaultDomain($tenant, $data['id']);
+
+        // Создаем подписку, если выбран тарифный план
+        if (!empty($data['plan_id'])) {
+            $plan = Plan::find($data['plan_id']);
+
+            if ($plan) {
+                $now = Carbon::now();
+
+                // Статус подписки в зависимости от статуса tenant
+                $tenantStatus = $data['status'] ?? TenantStatus::TRIAL->value;
+                $subscriptionStatus = match ($tenantStatus) {
+                    TenantStatus::ACTIVE->value => SubscriptionStatus::ACTIVE->value,
+                    TenantStatus::TRIAL->value => SubscriptionStatus::TRIALING->value,
+                    default => SubscriptionStatus::ACTIVE->value,
+                };
+
+                $startsAt = $now;
+                $trialEndsAt = null;
+                $endsAt = null;
+
+                if ($subscriptionStatus === SubscriptionStatus::TRIALING->value) {
+                    // Длительность пробного периода можно вынести в конфиг
+                    $trialDays = (int) config('billing.trial_days', 14);
+                    $trialEndsAt = $now->copy()->addDays($trialDays);
+                } else {
+                    // Окончание периода подписки в зависимости от интервала плана
+                    if ($plan->interval === 'monthly') {
+                        $endsAt = $now->copy()->addMonth();
+                    } elseif ($plan->interval === 'yearly') {
+                        $endsAt = $now->copy()->addYear();
+                    }
+                }
+
+                $tenant->subscription()->create([
+                    'plan_id' => $plan->id,
+                    'status' => $subscriptionStatus,
+                    'starts_at' => $startsAt,
+                    'ends_at' => $endsAt,
+                    'trial_ends_at' => $trialEndsAt,
+                ]);
+            }
+        }
 
         // Убеждаемся, что база данных создана (если события не сработали)
         $this->ensureDatabaseExists($tenant);
 
-        return $tenant;
+        return $tenant->fresh(['plan', 'subscription']);
     }
 
     /**
@@ -38,80 +85,55 @@ class TenantService
      */
     public function ensureDatabaseExists(Tenant $tenant): void
     {
-        \Log::info("ensureDatabaseExists: Начало для tenant {$tenant->id}");
-        
         try {
             // Проверяем, существует ли база данных
             $databaseName = config('tenancy.database.prefix') . $tenant->id . config('tenancy.database.suffix');
-            \Log::info("ensureDatabaseExists: Проверяем базу данных '{$databaseName}'");
             
             $databaseCreated = false;
             $databaseExists = $this->databaseExists($databaseName);
-            \Log::info("ensureDatabaseExists: База данных существует: " . ($databaseExists ? 'да' : 'нет'));
             
             // Пытаемся создать базу, если её нет
             if (!$databaseExists) {
-                \Log::info("ensureDatabaseExists: Создаем базу данных '{$databaseName}'");
                 $tenant->database()->manager()->createDatabase($tenant);
                 $databaseCreated = true;
-                \Log::info("ensureDatabaseExists: База данных '{$databaseName}' создана");
             }
 
             // Если база только что создана или нужно проверить миграции
             if ($databaseCreated) {
-                \Log::info("ensureDatabaseExists: Запускаем миграции для только что созданной базы");
                 // Запускаем миграции через Job
                 $migrateJob = new MigrateDatabase($tenant);
                 $migrateJob->handle($tenant);
-                \Log::info("ensureDatabaseExists: Миграции выполнены");
             } else {
-                \Log::info("ensureDatabaseExists: База уже существует, проверяем наличие таблиц");
-                // Проверяем, есть ли таблицы (миграции)
-                // Инициализируем tenant подключение
-                tenancy()->initialize($tenant);
+                // Создаем прямое подключение к tenant базе данных
+                $centralConnection = config('tenancy.database.central_connection', 'mysql');
+                $config = config("database.connections.{$centralConnection}");
+                $config['database'] = $databaseName;
+                \Config::set("database.connections.tenant_check", $config);
+                $tenantConnection = \DB::connection('tenant_check');
                 
-                // Проверяем подключение напрямую к tenant базе
-                $tenantConnection = \DB::connection('tenant');
                 try {
-                    // Получаем имя текущей базы данных через tenant подключение
+                    // Получаем имя текущей базы данных
                     $currentDatabase = $tenantConnection->select("SELECT DATABASE() as db")[0]->db ?? 'unknown';
-                    \Log::info("ensureDatabaseExists: Текущая база данных: {$currentDatabase}");
-                    \Log::info("ensureDatabaseExists: Ожидаемая база данных: {$databaseName}");
-                    
-                    // Если подключение не к той базе, переключаемся напрямую
-                    if ($currentDatabase !== $databaseName) {
-                        \Log::warning("ensureDatabaseExists: Подключение не к той базе! Переключаемся на {$databaseName}");
-                        // Используем прямое подключение к tenant базе
-                        $centralConnection = config('tenancy.database.central_connection', 'mysql');
-                        $config = config("database.connections.{$centralConnection}");
-                        $config['database'] = $databaseName;
-                        \Config::set("database.connections.tenant_temp", $config);
-                        $tenantConnection = \DB::connection('tenant_temp');
-                    }
                     
                     // Проверяем, сколько реальных таблиц в базе через правильное подключение
                     $tables = $tenantConnection->select("SHOW TABLES");
                     $tableCount = count($tables);
-                    \Log::info("ensureDatabaseExists: Всего таблиц в базе: {$tableCount}");
                     
-                    // Логируем список таблиц
                     $tableNames = [];
                     foreach ($tables as $table) {
                         $tableName = array_values((array)$table)[0];
                         $tableNames[] = $tableName;
                     }
-                    \Log::info("ensureDatabaseExists: Список таблиц: " . implode(', ', $tableNames));
                     
                     // Проверяем наличие таблицы migrations
                     try {
                         $migrationsCount = $tenantConnection->table('migrations')->count();
-                        \Log::info("ensureDatabaseExists: Таблица migrations найдена, записей: {$migrationsCount}");
                     } catch (\Exception $e) {
-                        \Log::info("ensureDatabaseExists: Таблица migrations не найдена");
+                        // Игнорируем ошибки
                     }
                     
                     // Проверяем наличие основных таблиц tenant
-                    $requiredTables = ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff'];
+                    $requiredTables = ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'];
                     $missingTables = [];
                     foreach ($requiredTables as $requiredTable) {
                         if (!in_array($requiredTable, $tableNames)) {
@@ -120,10 +142,50 @@ class TenantService
                     }
                     
                     if (!empty($missingTables)) {
-                        \Log::info("ensureDatabaseExists: Отсутствуют таблицы: " . implode(', ', $missingTables));
-                        \Log::info("ensureDatabaseExists: Запускаем миграции");
-                        $migrateJob = new MigrateDatabase($tenant);
-                        $migrateJob->handle($tenant);
+                        // Удаляем частично созданные таблицы, если они есть
+                        $partialTables = ['staff', 'locations', 'services', 'customers', 'bookings', 'service_staff', 'business', 'sessions', 'settings'];
+                        foreach ($partialTables as $table) {
+                            try {
+                                $tenantConnection->statement("DROP TABLE IF EXISTS `{$table}`");
+                            } catch (\Exception $e) {
+                                // Игнорируем ошибки, если таблицы нет
+                            }
+                        }
+                        
+                        // Создаем таблицу migrations, если её нет
+                        try {
+                            $tenantConnection->statement("
+                                CREATE TABLE IF NOT EXISTS `migrations` (
+                                    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                                    `migration` varchar(255) NOT NULL,
+                                    `batch` int(11) NOT NULL,
+                                    PRIMARY KEY (`id`)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                            ");
+                        } catch (\Exception $e) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        // Выполняем миграции напрямую через подключение
+                        $migrationPath = database_path('migrations/tenant');
+                        
+                        // Получаем список файлов миграций
+                        $migrationFiles = glob($migrationPath . '/*.php');
+                        
+                        // Выполняем миграции через прямое подключение
+                        $migrator = app('migrator');
+                        $migrator->setConnection('tenant_check');
+                        
+                        // Проверяем, какие миграции уже выполнены
+                        $ranMigrations = $migrator->getRepository()->getRan();
+                        
+                        // Выполняем только новые миграции
+                        $migrator->run([$migrationPath], ['--force' => true]);
+                        
+                        $ranMigrationsAfter = $migrator->getRepository()->getRan();
+                        
+                        // Запускаем seeder для ролей и разрешений
+                        $this->runTenantSeeder($tenantConnection);
                         
                         // Проверяем снова после миграций
                         $tablesAfter = $tenantConnection->select("SHOW TABLES");
@@ -133,36 +195,49 @@ class TenantService
                             $tableName = array_values((array)$table)[0];
                             $tableNamesAfter[] = $tableName;
                         }
-                        \Log::info("ensureDatabaseExists: После миграций таблиц в базе: {$tableCountAfter}");
-                        \Log::info("ensureDatabaseExists: Список таблиц после миграций: " . implode(', ', $tableNamesAfter));
-                    } else {
-                        \Log::info("ensureDatabaseExists: Все необходимые таблицы присутствуют ({$tableCount}), миграции не требуются");
                     }
                 } catch (\Exception $e) {
-                    \Log::info("ensureDatabaseExists: Ошибка при проверке таблиц, запускаем миграции. Ошибка: " . $e->getMessage());
-                    // Если таблиц нет - запускаем миграции
-                    $migrateJob = new MigrateDatabase($tenant);
-                    $migrateJob->handle($tenant);
-                    
-                    // Проверяем после миграций
+                    // Если таблиц нет - запускаем миграции напрямую
                     try {
-                        $tablesAfter = \DB::select("SHOW TABLES");
+                        // Создаем таблицу migrations, если её нет
+                        try {
+                            $tenantConnection->statement("
+                                CREATE TABLE IF NOT EXISTS `migrations` (
+                                    `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+                                    `migration` varchar(255) NOT NULL,
+                                    `batch` int(11) NOT NULL,
+                                    PRIMARY KEY (`id`)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                            ");
+                        } catch (\Exception $e3) {
+                            // Игнорируем ошибки
+                        }
+                        
+                        $migrationPath = database_path('migrations/tenant');
+                        $migrator = app('migrator');
+                        $migrator->setConnection('tenant_check');
+                        $migrator->run([$migrationPath], ['--force' => true]);
+                        
+                        // Запускаем seeder для ролей и разрешений
+                        $this->runTenantSeeder($tenantConnection);
+                        
+                        // Проверяем после миграций
+                        $tablesAfter = $tenantConnection->select("SHOW TABLES");
                         $tableCountAfter = count($tablesAfter);
-                        \Log::info("ensureDatabaseExists: После миграций таблиц в базе: {$tableCountAfter}");
+                        $tableNamesAfter = [];
+                        foreach ($tablesAfter as $table) {
+                            $tableName = array_values((array)$table)[0];
+                            $tableNamesAfter[] = $tableName;
+                        }
                     } catch (\Exception $e2) {
-                        \Log::error("ensureDatabaseExists: Не удалось проверить таблицы после миграций: " . $e2->getMessage());
+                        // Игнорируем ошибки
                     }
-                    \Log::info("ensureDatabaseExists: Миграции выполнены");
                 } finally {
-                    tenancy()->end();
+                    // Закрываем временное подключение
+                    $tenantConnection->disconnect();
                 }
             }
-            
-            \Log::info("ensureDatabaseExists: Успешно завершено для tenant {$tenant->id}");
         } catch (\Exception $e) {
-            // Логируем ошибку, но не прерываем выполнение
-            \Log::error("ensureDatabaseExists: Ошибка для tenant {$tenant->id}: " . $e->getMessage());
-            \Log::error("ensureDatabaseExists: Stack trace: " . $e->getTraceAsString());
             throw $e; // Пробрасываем исключение, чтобы контроллер мог его обработать
         }
     }
@@ -217,6 +292,109 @@ class TenantService
     }
 
     /**
+     * Проверить статус миграций для tenant
+     *
+     * @param Tenant $tenant
+     * @return array
+     */
+    public function getMigrationStatus(Tenant $tenant): array
+    {
+        $databaseName = config('tenancy.database.prefix') . $tenant->id . config('tenancy.database.suffix');
+        
+        // Проверяем, существует ли база данных
+        if (!$this->databaseExists($databaseName)) {
+            return [
+                'database_exists' => false,
+                'migrations_completed' => false,
+                'table_count' => 0,
+                'required_tables' => [],
+                'missing_tables' => ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'],
+            ];
+        }
+        
+        // Создаем подключение к tenant базе
+        $centralConnection = config('tenancy.database.central_connection', 'mysql');
+        $config = config("database.connections.{$centralConnection}");
+        $config['database'] = $databaseName;
+        \Config::set("database.connections.tenant_status", $config);
+        $tenantConnection = \DB::connection('tenant_status');
+        
+        try {
+            // Проверяем таблицы
+            $tables = $tenantConnection->select("SHOW TABLES");
+            $tableCount = count($tables);
+            
+            $tableNames = [];
+            foreach ($tables as $table) {
+                $tableName = array_values((array)$table)[0];
+                $tableNames[] = $tableName;
+            }
+            
+            // Проверяем наличие основных таблиц
+            $requiredTables = ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'];
+            $missingTables = [];
+            foreach ($requiredTables as $requiredTable) {
+                if (!in_array($requiredTable, $tableNames)) {
+                    $missingTables[] = $requiredTable;
+                }
+            }
+            
+            return [
+                'database_exists' => true,
+                'migrations_completed' => empty($missingTables),
+                'table_count' => $tableCount,
+                'required_tables' => $requiredTables,
+                'missing_tables' => $missingTables,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'database_exists' => true,
+                'migrations_completed' => false,
+                'table_count' => 0,
+                'required_tables' => [],
+                'missing_tables' => ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'],
+                'error' => $e->getMessage(),
+            ];
+        } finally {
+            $tenantConnection->disconnect();
+        }
+    }
+
+    /**
+     * Запустить seeder для tenant БД
+     *
+     * @param \Illuminate\Database\Connection $connection
+     * @return void
+     */
+    protected function runTenantSeeder($connection): void
+    {
+        try {
+            // Сохраняем текущее подключение
+            $originalConnection = \DB::getDefaultConnection();
+            
+            // Устанавливаем подключение для seeder
+            \DB::setDefaultConnection($connection->getName());
+            
+            // Устанавливаем подключение для моделей Spatie Permission
+            \Config::set('database.default', $connection->getName());
+            
+            // Запускаем seeder
+            $seeder = new \Database\Seeders\TenantRolePermissionSeeder();
+            // Создаем фиктивную команду для seeder
+            if (app()->bound('Illuminate\Console\Command')) {
+                $seeder->setCommand(app('Illuminate\Console\Command'));
+            }
+            $seeder->run();
+            
+            // Восстанавливаем подключение
+            \DB::setDefaultConnection($originalConnection);
+            \Config::set('database.default', $originalConnection);
+        } catch (\Exception $e) {
+            // Игнорируем ошибки
+        }
+    }
+
+    /**
      * Удалить tenant и все связанные данные
      *
      * @param Tenant $tenant
@@ -224,6 +402,16 @@ class TenantService
      */
     public function deleteTenant(Tenant $tenant): bool
     {
+        // Пытаемся удалить базу данных tenant
+        try {
+            $databaseName = config('tenancy.database.prefix') . $tenant->id . config('tenancy.database.suffix');
+
+            // Менеджер БД tenancy отвечает за фактический DROP DATABASE
+            $tenant->database()->manager()->deleteDatabase($tenant);
+        } catch (\Throwable $e) {
+            // Игнорируем ошибки
+        }
+
         // Удаление всех доменов
         $tenant->domains()->delete();
 

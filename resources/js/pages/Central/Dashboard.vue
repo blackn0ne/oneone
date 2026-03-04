@@ -131,9 +131,23 @@ const props = defineProps<Props>();
                                     <p class="font-medium">{{ tenant.name }}</p>
                                     <p class="text-sm text-muted-foreground">{{ tenant.email }}</p>
                                 </div>
-                                <Badge :variant="tenant.status === 'active' ? 'default' : 'secondary'">
-                                    {{ tenant.status }}
-                                </Badge>
+                                <div class="flex items-center gap-2">
+                                    <Badge :variant="tenant.status === 'active' ? 'default' : 'secondary'">
+                                        {{ tenant.status }}
+                                    </Badge>
+                                    <a
+                                        :href="`/${tenant.id}`"
+                                        class="text-sm text-primary hover:underline"
+                                    >
+                                        Сайт
+                                    </a>
+                                    <a
+                                        :href="`/set-tenant/${tenant.id}`"
+                                        class="text-sm text-primary hover:underline"
+                                    >
+                                        Панель
+                                    </a>
+                                </div>
                             </div>
                             <p v-if="recentTenants.length === 0" class="text-muted-foreground text-sm">
                                 Нет tenants

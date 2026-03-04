@@ -19,6 +19,8 @@ return [
     'central_domains' => [
         '127.0.0.1',
         'localhost',
+        // Добавляем основной домен приложения, чтобы tenancy не пытался искать tenant по этому домену
+        'oneone.asd',
     ],
 
     /**
@@ -50,8 +52,10 @@ return [
         /**
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
+         *
+         * Пример: для tenant_id = "asdasd" получим БД "oneone-asdasd".
          */
-        'prefix' => 'tenant',
+        'prefix' => 'oneone-',
         'suffix' => '',
 
         /**
@@ -135,7 +139,9 @@ return [
          * disable asset() helper tenancy and explicitly use tenant_asset() calls in places
          * where you want to use tenant-specific assets (product images, avatars, etc).
          */
-        'asset_helper_tenancy' => true,
+        // Для локальной разработки и общего бандла отключаем tenant-специфичные asset() URL
+        // чтобы не использовать /tenancy/assets и избегать ошибок идентификации tenant по домену.
+        'asset_helper_tenancy' => false,
     ],
 
     /**
@@ -178,7 +184,9 @@ return [
      * enabled. But it may be useful to disable them if you use external
      * storage (e.g. S3 / Dropbox) or have a custom asset controller.
      */
-    'routes' => true,
+    // Отключаем встроенные tenancy-маршруты (включая /tenancy/assets),
+    // так как мы используем общий билд ассетов для всех tenants.
+    'routes' => false,
 
     /**
      * Parameters used by the tenants:migrate command.

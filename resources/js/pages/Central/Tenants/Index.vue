@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from 'lucide-vue-next';
+import { PlusIcon, EyeIcon, PencilIcon, Trash2Icon } from 'lucide-vue-next';
 import { route } from '@/lib/routes';
 
 interface Tenant {
@@ -46,6 +46,12 @@ const statusVariants = {
     suspended: 'destructive',
     trial: 'secondary',
 } as const;
+
+const deleteTenant = (tenant: Tenant) => {
+    if (confirm(`Вы уверены, что хотите удалить tenant "${tenant.name}"? Это действие нельзя отменить.`)) {
+        router.delete(route('central.tenants.destroy', tenant.id));
+    }
+};
 </script>
 
 <template>
@@ -99,9 +105,26 @@ const statusVariants = {
                                     </Badge>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <Link :href="route('central.tenants.show', tenant.id)">
-                                        <Button variant="ghost" size="sm">Просмотр</Button>
-                                    </Link>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <Link :href="route('central.tenants.show', tenant.id)">
+                                            <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+                                                <EyeIcon class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                        <Link :href="route('central.tenants.edit', tenant.id)">
+                                            <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+                                                <PencilIcon class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            class="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            @click="deleteTenant(tenant)"
+                                        >
+                                            <Trash2Icon class="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="tenants.data.length === 0">
