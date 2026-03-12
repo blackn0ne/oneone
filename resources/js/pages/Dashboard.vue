@@ -91,7 +91,7 @@ const statusVariants = {
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">
-                            {{ stats.total_revenue.toLocaleString('ru-RU') }} ₽
+                            {{ stats.total_revenue.toLocaleString('ru-RU') }} ₸
                         </div>
                         <p class="text-xs text-muted-foreground">Всего заработано</p>
                     </CardContent>
@@ -156,7 +156,7 @@ const statusVariants = {
                                         {{ statusLabels[booking.status] }}
                                     </Badge>
                                     <p class="mt-1 text-sm font-medium">
-                                        {{ booking.total_price?.toLocaleString('ru-RU') }} ₽
+                                        {{ booking.total_price?.toLocaleString('ru-RU') }} ₸
                                     </p>
                                 </div>
                             </div>

@@ -130,7 +130,7 @@ const submit = () => {
                                 <div>
                                     <p class="text-sm font-medium">Цена</p>
                                     <p class="text-xs text-muted-foreground">
-                                        {{ booking.total_price?.toLocaleString('ru-RU') }} ₽
+                                        {{ booking.total_price?.toLocaleString('ru-RU') }} ₸
                                     </p>
                                 </div>
                             </div>

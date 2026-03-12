@@ -4,7 +4,8 @@ export type User = {
     email: string;
     avatar?: string;
     email_verified_at: string | null;
-    is_super_admin?: boolean;
+    role?: 'super_admin' | 'admin' | 'staff';
+    is_super_admin?: boolean; // Для обратной совместимости, вычисляется из role
     roles?: string[];
     created_at: string;
     updated_at: string;

@@ -9,13 +9,15 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\SetTenantController;
 use App\Http\Controllers\Central\SubscriptionController;
 use App\Http\Controllers\Central\DashboardController;
-use App\Http\Controllers\Central\SettingsController;
+use App\Http\Controllers\Central\SettingsController as CentralSettingsController;
 use App\Http\Controllers\Central\LanguageController;
 use App\Http\Controllers\Central\UserController;
 use App\Http\Controllers\Tenant\BookingController;
 use App\Http\Controllers\Tenant\ServiceController;
 use App\Http\Controllers\Tenant\StaffController;
 use App\Http\Controllers\Tenant\CustomerController;
+use App\Http\Controllers\Tenant\BusinessController;
+use App\Http\Controllers\Tenant\SettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,11 +50,11 @@ Route::middleware(['auth', 'verified', 'super_admin'])->prefix('central')->name(
     Route::post('/languages/{language}/translations', [LanguageController::class, 'updateTranslations'])->name('languages.translations.update');
     
     // Settings
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general.update');
-    Route::post('/settings/payment', [SettingsController::class, 'updatePayment'])->name('settings.payment.update');
-    Route::post('/settings/email', [SettingsController::class, 'updateEmail'])->name('settings.email.update');
-    Route::post('/settings/whatsapp', [SettingsController::class, 'updateWhatsApp'])->name('settings.whatsapp.update');
+    Route::get('/settings', [CentralSettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/general', [CentralSettingsController::class, 'updateGeneral'])->name('settings.general.update');
+    Route::post('/settings/payment', [CentralSettingsController::class, 'updatePayment'])->name('settings.payment.update');
+    Route::post('/settings/email', [CentralSettingsController::class, 'updateEmail'])->name('settings.email.update');
+    Route::post('/settings/whatsapp', [CentralSettingsController::class, 'updateWhatsApp'])->name('settings.whatsapp.update');
 });
 
 // Dashboard — роутер по роли
@@ -64,12 +66,13 @@ Route::get('set-tenant/{tenant}', SetTenantController::class)->middleware(['auth
 // Панель tenant: /bookings, /services и т.д. (tenant из сессии)
 Route::middleware(['auth', 'verified', 'tenant.session'])->group(function () {
     Route::resource('bookings', BookingController::class);
-    Route::resource('services', ServiceController::class);
+    Route::resource('services', ServiceController::class)->except(['create']);
     Route::resource('staff', StaffController::class);
     Route::resource('customers', CustomerController::class);
     Route::get('reports', [\App\Http\Controllers\Tenant\ReportController::class, 'index'])->name('reports.index');
-    Route::get('business', [\App\Http\Controllers\Tenant\BusinessController::class, 'index'])->name('business.index');
-    Route::put('business', [\App\Http\Controllers\Tenant\BusinessController::class, 'update'])->name('business.update');
+    Route::resource('business', BusinessController::class);
+    Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
 });
 
 require __DIR__.'/settings.php';

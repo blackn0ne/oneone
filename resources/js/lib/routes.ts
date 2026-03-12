@@ -21,7 +21,6 @@ export function route(name: string, params?: any): string {
         
         // Services (tenant)
         'services.index': '/services',
-        'services.create': '/services/create',
         'services.store': '/services',
         'services.show': (id: number) => `/services/${id}`,
         'services.edit': (id: number) => `/services/${id}/edit`,
@@ -49,6 +48,19 @@ export function route(name: string, params?: any): string {
         // Reports (tenant)
         'reports.index': '/reports',
         
+        // Business (tenant) - точки продаж
+        'business.index': '/business',
+        'business.create': '/business/create',
+        'business.store': '/business',
+        'business.show': (id: number) => `/business/${id}`,
+        'business.edit': (id: number) => `/business/${id}/edit`,
+        'business.update': (id: number) => `/business/${id}`,
+        'business.destroy': (id: number) => `/business/${id}`,
+        
+        // Settings (tenant) - настройки компании
+        'settings.index': '/settings',
+        'settings.update': '/settings',
+        
         // Roles (tenant)
         'roles.index': '/roles',
         'roles.create': '/roles/create',
@@ -57,10 +69,6 @@ export function route(name: string, params?: any): string {
         'roles.edit': (id: number) => `/roles/${id}/edit`,
         'roles.update': (id: number) => `/roles/${id}`,
         'roles.destroy': (id: number) => `/roles/${id}`,
-        
-        // Business (tenant)
-        'business.index': '/business',
-        'business.update': '/business',
         
         // Central
         'central.dashboard': '/central/dashboard',

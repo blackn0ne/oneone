@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreBusinessRequest;
+use App\Http\Requests\Tenant\UpdateBusinessRequest;
 use App\Models\Tenant\Business;
+use App\Services\Tenant\BusinessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,76 +14,105 @@ use Inertia\Response;
 
 class BusinessController extends Controller
 {
+    public function __construct(
+        private readonly BusinessService $businessService
+    ) {
+    }
+
     /**
-     * Показать настройки бизнеса
+     * Показать список точек продаж
      */
     public function index(Request $request): Response
     {
-        $business = Business::getInstance();
-
-        // Преобразуем в массив для передачи во фронтенд
-        $businessData = null;
-        if ($business) {
-            // Получаем working_hours напрямую из модели (cast должен декодировать)
-            $workingHours = $business->working_hours;
-            
-            // Если это строка, декодируем
-            if (is_string($workingHours)) {
-                $workingHours = json_decode($workingHours, true);
-            }
-            
-            // Если null или пусто, устанавливаем пустой массив
-            if (empty($workingHours) || !is_array($workingHours)) {
-                $workingHours = [];
-            }
-            
-            $businessData = $business->toArray();
-            $businessData['working_hours'] = $workingHours;
-        }
+        $businesses = Business::latest()
+            ->paginate(15);
 
         return Inertia::render('Business/Index', [
-            'business' => $businessData,
+            'businesses' => $businesses,
         ]);
     }
 
     /**
-     * Обновить настройки бизнеса
+     * Показать форму создания точки продаж
      */
-    public function update(Request $request): RedirectResponse
+    public function create(Request $request): Response
     {
-        $validated = $request->validate([
-            'company_name' => ['nullable', 'string', 'max:255'],
-            'company_slogan' => ['nullable', 'string', 'max:255'],
-            'meta_title' => ['nullable', 'string', 'max:255'],
-            'meta_description' => ['nullable', 'string'],
-            'meta_keywords' => ['nullable', 'string'],
-            'logo' => ['nullable', 'string'],
-            'favicon' => ['nullable', 'string'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'email'],
-            'country' => ['nullable', 'string', 'max:100'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'address' => ['nullable', 'string'],
-            'working_hours' => ['nullable', 'array'],
-            'working_hours.*.is_closed' => ['nullable', 'boolean'],
-            'working_hours.*.start' => ['nullable', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'working_hours.*.end' => ['nullable', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
-            'social_links' => ['nullable', 'array'],
-            'global_currency' => ['nullable', 'string', 'size:3'],
-            'default_language' => ['nullable', 'string', 'max:10'],
-            'languages' => ['nullable', 'array'],
-        ]);
+        return Inertia::render('Business/Create');
+    }
 
-        $business = Business::first();
-        
-        if (!$business) {
-            $business = Business::create($validated);
-        } else {
-            $business->update($validated);
+    /**
+     * Сохранить новую точку продаж
+     */
+    public function store(StoreBusinessRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $business = Business::create($validated);
+
+        // Синхронизируем рабочие часы
+        if (isset($validated['working_hours'])) {
+            $this->businessService->syncWorkingHours($business, $validated['working_hours']);
         }
 
         return redirect()
             ->route('business.index')
-            ->with('success', 'Настройки бизнеса обновлены!');
+            ->with('success', 'Точка продаж создана!');
+    }
+
+    /**
+     * Показать детальную информацию о точке продаж
+     */
+    public function show($id): Response
+    {
+        $business = Business::findOrFail($id);
+
+        return Inertia::render('Business/Show', [
+            'business' => $business,
+        ]);
+    }
+
+    /**
+     * Показать форму редактирования точки продаж
+     */
+    public function edit(Request $request, $id): Response
+    {
+        $business = Business::findOrFail($id);
+
+        return Inertia::render('Business/Edit', [
+            'business' => $this->businessService->getBusinessForEdit($business),
+        ]);
+    }
+
+    /**
+     * Обновить точку продаж
+     */
+    public function update(UpdateBusinessRequest $request, $id): RedirectResponse
+    {
+        $business = Business::findOrFail($id);
+        $validated = $request->validated();
+
+        $business->update($validated);
+
+        // Синхронизируем рабочие часы
+        if (isset($validated['working_hours'])) {
+            $this->businessService->syncWorkingHours($business, $validated['working_hours']);
+        }
+
+        return redirect()
+            ->route('business.index')
+            ->with('success', 'Точка продаж обновлена!');
+    }
+
+    /**
+     * Удалить точку продаж
+     */
+    public function destroy($id): RedirectResponse
+    {
+        $business = Business::findOrFail($id);
+        $business->delete();
+
+        return redirect()
+            ->route('business.index')
+            ->with('success', 'Точка продаж удалена!');
     }
 }

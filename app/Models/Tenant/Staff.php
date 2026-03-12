@@ -21,7 +21,6 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $specialization
  * @property bool $is_active
  * @property array|null $locations
- * @property array|null $working_hours
  * @property array|null $breaks
  * @property array|null $holidays
  */
@@ -34,9 +33,15 @@ class Staff extends Model
      * а не в центральной базе данных.
      */
     protected $connection = 'tenant';
+    
+    /**
+     * Guard name для Spatie Permission
+     */
+    protected $guard_name = 'web';
 
     protected $fillable = [
         'user_id',
+        'business_id',
         'name',
         'email',
         'phone',
@@ -44,7 +49,6 @@ class Staff extends Model
         'specialization',
         'is_active',
         'locations',
-        'working_hours',
         'breaks',
         'holidays',
     ];
@@ -52,7 +56,6 @@ class Staff extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'locations' => 'array',
-        'working_hours' => 'array',
         'breaks' => 'array',
         'holidays' => 'array',
     ];
@@ -80,5 +83,13 @@ class Staff extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    /**
+     * Связь с точкой продаж
+     */
+    public function business(): BelongsTo
+    {
+        return $this->belongsTo(Business::class, 'business_id');
     }
 }

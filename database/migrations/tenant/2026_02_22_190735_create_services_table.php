@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('services')) {
+            return;
+        }
+        
         Schema::create('services', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -18,17 +22,10 @@ return new class extends Migration
             $table->integer('duration')->default(60); // минуты
             $table->decimal('price', 10, 2)->default(0);
             // $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete(); // TODO: создать categories таблицу
-            $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
+            $table->foreignId('business_id')->nullable()->constrained('business')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->enum('booking_mode', ['service', 'hotel', 'event', 'online', 'rental', 'chauffeur'])->default('service');
-            $table->integer('buffer_time_before')->default(0);
-            $table->integer('buffer_time_after')->default(0);
-            $table->integer('prepare_time')->default(0);
-            $table->integer('max_participants')->nullable();
-            $table->integer('min_duration')->nullable();
-            $table->integer('max_duration')->nullable();
-            $table->boolean('allow_custom_duration')->default(false);
-            $table->boolean('allow_recurring')->default(false);
+            $table->integer('interval')->default(15); // интервал в минутах для слотов бронирования
             $table->json('metadata')->nullable();
             $table->timestamps();
 

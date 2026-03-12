@@ -16,7 +16,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    currency: 'USD',
+    currency: 'KZT',
     isActive: true,
 });
 

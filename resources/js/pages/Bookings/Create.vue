@@ -32,7 +32,7 @@ const form = useForm({
     service_id: '',
     staff_id: '',
     customer_id: '',
-    location_id: '',
+    business_id: '',
     start_time: '',
     end_time: '',
     duration: null as number | null,
@@ -142,7 +142,7 @@ const handleClose = (open: boolean) => {
                                     :key="service.id"
                                     :value="String(service.id)"
                                 >
-                                    {{ service.name }} - {{ service.price }} ₽
+                                    {{ service.name }} - {{ service.price }} ₸
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -235,42 +235,11 @@ const handleClose = (open: boolean) => {
                         </p>
                     </div>
 
-                    <!-- Длительность -->
-                    <div v-if="selectedService?.allow_custom_duration" class="space-y-2">
-                        <Label for="duration">Длительность (минуты)</Label>
-                        <Input
-                            id="duration"
-                            v-model.number="form.duration"
-                            type="number"
-                            min="1"
-                            @input="updateDateTime"
-                        />
-                    </div>
-
-                    <!-- Участники -->
-                    <div v-if="selectedService?.max_participants" class="space-y-2">
-                        <div class="flex items-center space-x-2">
-                            <Checkbox id="is_group" v-model:checked="form.is_group" />
-                            <Label for="is_group" class="cursor-pointer">
-                                Групповое бронирование
-                            </Label>
-                        </div>
-                        <div v-if="form.is_group" class="space-y-2">
-                            <Label for="participants">Количество участников</Label>
-                            <Input
-                                id="participants"
-                                v-model.number="form.participants_count"
-                                type="number"
-                                :min="1"
-                                :max="selectedService?.max_participants"
-                            />
-                        </div>
-                    </div>
 
                     <!-- Повторяющееся бронирование -->
                     <div class="space-y-2">
                         <div class="flex items-center space-x-2">
-                            <Checkbox id="recurring" v-model:checked="form.is_recurring" />
+                            <Checkbox id="recurring" v-model="form.is_recurring" />
                             <Label for="recurring" class="cursor-pointer">
                                 Повторяющееся бронирование
                             </Label>

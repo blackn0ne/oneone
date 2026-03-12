@@ -6,15 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { route } from '@/lib/routes';
 
-interface Permission {
+interface Role {
     id: number;
     name: string;
 }
 
 interface Props {
-    permissions: Record<string, Permission[]>;
+    roles: Role[];
 }
 
 const props = defineProps<Props>();
@@ -25,68 +26,20 @@ const form = useForm({
     phone: '',
     specialization: '',
     is_active: true,
-    permissions: [] as number[],
+    role_id: null as number | null,
 });
 
 const submit = () => {
     form.post(route('staff.store'));
 };
 
-const togglePermission = (permissionId: number) => {
-    const index = form.permissions.indexOf(permissionId);
-    if (index > -1) {
-        form.permissions.splice(index, 1);
-    } else {
-        form.permissions.push(permissionId);
-    }
-};
-
-const toggleAllInGroup = (groupPermissions: Permission[]) => {
-    const allSelected = groupPermissions.every(p => form.permissions.includes(p.id));
-    if (allSelected) {
-        groupPermissions.forEach(p => {
-            const index = form.permissions.indexOf(p.id);
-            if (index > -1) form.permissions.splice(index, 1);
-        });
-    } else {
-        groupPermissions.forEach(p => {
-            if (!form.permissions.includes(p.id)) {
-                form.permissions.push(p.id);
-            }
-        });
-    }
-};
-
-const getModuleLabel = (module: string): string => {
-    const labels: Record<string, string> = {
-        'view': 'Просмотр',
-        'create': 'Создание',
-        'edit': 'Редактирование',
-        'delete': 'Удаление',
-        'cancel': 'Отмена',
-        'assign': 'Назначение',
-        'manage': 'Управление',
-        'bookings': 'Бронирования',
-        'services': 'Услуги',
-        'staff': 'Сотрудники',
-        'customers': 'Клиенты',
-        'locations': 'Локации',
-        'settings': 'Настройки',
-        'roles': 'Роли',
-        'reports': 'Отчеты',
-        'all': 'Все',
+const getRoleDescription = (roleName: string): string => {
+    const descriptions: Record<string, string> = {
+        'Мастер': 'Может видеть только свои бронирования и менять их статус',
+        'Менеджер': 'Почти все разрешения, кроме отчетов и настроек бизнеса',
+        'Админ': 'Все разрешения',
     };
-    return labels[module] || module;
-};
-
-const formatPermissionName = (name: string): string => {
-    const parts = name.split(' ');
-    if (parts.length > 1) {
-        const action = getModuleLabel(parts[0]);
-        const module = getModuleLabel(parts[1]);
-        return `${action} ${module}`;
-    }
-    return name;
+    return descriptions[roleName] || '';
 };
 </script>
 
@@ -148,59 +101,35 @@ const formatPermissionName = (name: string): string => {
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <Checkbox id="is_active" v-model:checked="form.is_active" />
+                            <Checkbox id="is_active" v-model="form.is_active" />
                             <Label for="is_active" class="cursor-pointer">Активен</Label>
                         </div>
 
-                        <div class="space-y-4 border-t pt-4">
-                            <div>
-                                <Label class="text-base font-semibold">Разрешения</Label>
-                                <p class="text-sm text-muted-foreground mb-4">
-                                    Выберите разрешения для сотрудника. Разрешения сгруппированы по модулям.
-                                </p>
-                            </div>
-                            <div class="space-y-4">
-                                <div
-                                    v-for="(group, module) in permissions"
-                                    :key="module"
-                                    class="space-y-2 border rounded-lg p-4"
-                                >
-                                    <div class="flex items-center justify-between mb-2">
-                                        <Label class="text-base font-semibold capitalize">
-                                            {{ getModuleLabel(module) }}
-                                        </Label>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="toggleAllInGroup(group)"
-                                        >
-                                            {{ group.every(p => form.permissions.includes(p.id)) ? 'Снять все' : 'Выбрать все' }}
-                                        </Button>
-                                    </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        <div
-                                            v-for="permission in group"
-                                            :key="permission.id"
-                                            class="flex items-center space-x-2"
-                                        >
-                                            <Checkbox
-                                                :id="`permission-${permission.id}`"
-                                                :checked="form.permissions.includes(permission.id)"
-                                                @update:checked="togglePermission(permission.id)"
-                                            />
-                                            <Label
-                                                :for="`permission-${permission.id}`"
-                                                class="text-sm font-normal cursor-pointer"
-                                            >
-                                                {{ formatPermissionName(permission.name) }}
-                                            </Label>
+                        <div class="space-y-2 border-t pt-4">
+                            <Label for="role_id">Роль *</Label>
+                            <Select
+                                id="role_id"
+                                v-model="form.role_id"
+                                required
+                            >
+                                <SelectTrigger class="w-full">
+                                    <SelectValue placeholder="Выберите роль" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="role in roles"
+                                        :key="role.id"
+                                        :value="String(role.id)"
+                                    >
+                                        <div class="flex flex-col">
+                                            <span class="font-medium">{{ role.name }}</span>
+                                            <span class="text-xs text-muted-foreground">{{ getRoleDescription(role.name) }}</span>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <p v-if="form.errors.permissions" class="text-sm text-destructive">
-                                {{ form.errors.permissions }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p v-if="form.errors.role_id" class="text-sm text-destructive">
+                                {{ form.errors.role_id }}
                             </p>
                         </div>
                     </CardContent>

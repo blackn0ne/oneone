@@ -24,7 +24,8 @@ interface User {
     id: number;
     name: string;
     email: string;
-    is_super_admin: boolean;
+    role?: 'super_admin' | 'admin' | 'staff';
+    is_super_admin?: boolean;
     roles?: Array<{ name: string }>;
     tenant_connections?: TenantConnection[];
 }
@@ -61,7 +62,7 @@ const deleteUser = () => {
                     <Link :href="route('central.users.edit', user.id)">
                         <Button>{{ t('users.edit', 'Редактировать') }}</Button>
                     </Link>
-                    <Button v-if="!user.is_super_admin" variant="destructive" @click="deleteUser">
+                    <Button v-if="user.role !== 'super_admin' && !user.is_super_admin" variant="destructive" @click="deleteUser">
                         {{ t('users.delete', 'Удалить') }}
                     </Button>
                 </div>
@@ -86,7 +87,7 @@ const deleteUser = () => {
                         <div>
                             <p class="text-sm font-medium text-muted-foreground">{{ t('users.status', 'Статус') }}</p>
                             <div class="flex flex-wrap gap-2 mt-1">
-                                <Badge v-if="user.is_super_admin" variant="default">
+                                <Badge v-if="user.role === 'super_admin' || user.is_super_admin" variant="default">
                                     {{ t('users.super_admin', 'Супер-админ') }}
                                 </Badge>
                                 <Badge v-for="role in user.roles" :key="role.name" variant="secondary">

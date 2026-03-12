@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('staff')) {
+            return;
+        }
+        
         Schema::create('staff', function (Blueprint $table) {
             $table->id();
             // user_id ссылается на users в центральной базе, поэтому foreign key не нужен
@@ -22,7 +26,6 @@ return new class extends Migration
             $table->string('specialization')->nullable();
             $table->boolean('is_active')->default(true);
             $table->json('locations')->nullable();
-            $table->json('working_hours')->nullable();
             $table->json('breaks')->nullable();
             $table->json('holidays')->nullable();
             $table->timestamps();

@@ -16,33 +16,27 @@ class StaffController extends Controller
 {
     public function index(Request $request): Response
     {
-        $staff = Staff::withCount('bookings')
+        // Убеждаемся, что роли созданы
+        $this->ensureRolesExist();
+        
+        $staff = Staff::with('roles')->withCount('bookings')
             ->latest()
             ->paginate(15);
-
-        // Данные для формы создания
-        $this->ensurePermissionsExist();
-        $allPermissions = \Spatie\Permission\Models\Permission::on('tenant')
-            ->orderBy('name')
-            ->get();
-
-        $permissions = $allPermissions
-            ->groupBy(function ($permission) {
-                $parts = explode(' ', $permission->name);
-                return $parts[0];
-            })
-            ->map(function ($group, $module) {
-                return $group->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                    ];
-                })->values();
+        
+        $roles = \Spatie\Permission\Models\Role::on('tenant')
+            ->whereIn('name', ['Мастер', 'Менеджер', 'Админ'])
+            ->orderByRaw("FIELD(name, 'Мастер', 'Менеджер', 'Админ')")
+            ->get()
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ];
             });
 
         return Inertia::render('Staff/Index', [
             'staff' => $staff,
-            'permissions' => $permissions,
+            'roles' => $roles,
         ]);
     }
 
@@ -51,30 +45,22 @@ class StaffController extends Controller
      */
     public function create(Request $request): Response
     {
-        // Убеждаемся, что разрешения созданы в tenant БД
-        $this->ensurePermissionsExist();
+        // Убеждаемся, что роли созданы
+        $this->ensureRolesExist();
         
-        $allPermissions = \Spatie\Permission\Models\Permission::on('tenant')
-            ->orderBy('name')
-            ->get();
-
-        $permissions = $allPermissions
-            ->groupBy(function ($permission) {
-                // Группируем разрешения по модулям (первое слово)
-                $parts = explode(' ', $permission->name);
-                return $parts[0]; // bookings, services, staff, etc.
-            })
-            ->map(function ($group, $module) {
-                return $group->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                    ];
-                })->values();
+        $roles = \Spatie\Permission\Models\Role::on('tenant')
+            ->whereIn('name', ['Мастер', 'Менеджер', 'Админ'])
+            ->orderByRaw("FIELD(name, 'Мастер', 'Менеджер', 'Админ')")
+            ->get()
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ];
             });
 
         return Inertia::render('Staff/Create', [
-            'permissions' => $permissions,
+            'roles' => $roles,
         ]);
     }
 
@@ -88,7 +74,7 @@ class StaffController extends Controller
             'view services', 'create services', 'edit services', 'delete services',
             'view staff', 'create staff', 'edit staff', 'delete staff',
             'view customers', 'create customers', 'edit customers', 'delete customers',
-            'view locations', 'create locations', 'edit locations', 'delete locations',
+            'view business', 'create business', 'edit business', 'delete business',
             'view settings', 'edit settings',
             'view reports',
             'manage all',
@@ -99,6 +85,19 @@ class StaffController extends Controller
                 ['name' => $permissionName, 'guard_name' => 'web']
             );
         }
+    }
+
+    /**
+     * Убедиться, что роли существуют в tenant БД
+     */
+    protected function ensureRolesExist(): void
+    {
+        // Сначала убеждаемся, что разрешения существуют
+        $this->ensurePermissionsExist();
+        
+        // Запускаем сидер для создания ролей
+        $seeder = new \Database\Seeders\TenantRolePermissionSeeder();
+        $seeder->run();
     }
 
     /**
@@ -115,22 +114,55 @@ class StaffController extends Controller
             'phone' => ['nullable', 'string', 'max:20'],
             'specialization' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
-            'working_hours' => ['nullable', 'array'],
             'breaks' => ['nullable', 'array'],
             'holidays' => ['nullable', 'array'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:tenant.permissions,id'],
+            'role_id' => ['nullable', 'exists:tenant.roles,id'],
+            'password' => ['nullable', 'string', 'min:8'],
         ]);
 
-        $permissions = $validated['permissions'] ?? [];
-        unset($validated['permissions']);
+        $roleId = $validated['role_id'] ?? null;
+        unset($validated['role_id']);
+        
+        $password = $validated['password'] ?? null;
+        unset($validated['password']);
 
+        // Создаем User, если указан phone
+        $userId = null;
+        if (!empty($validated['phone'])) {
+            $user = \App\Models\User::firstOrCreate(
+                ['phone' => $validated['phone']],
+                [
+                    'name' => $validated['name'],
+                    'email' => $validated['email'] ?? null,
+                    'password' => $password ? \Hash::make($password) : \Hash::make($validated['phone']), // По умолчанию пароль = телефон
+                    'role' => 'staff',
+                ]
+            );
+            
+            // Обновляем пароль, если он был указан
+            if ($password && $user->wasRecentlyCreated === false) {
+                $user->password = \Hash::make($password);
+                $user->save();
+            }
+            
+            $userId = $user->id;
+        }
+
+        $validated['user_id'] = $userId;
         $staff = Staff::create($validated);
 
-        // Назначаем разрешения сотруднику напрямую
-        if (!empty($permissions)) {
-            $permissionModels = \Spatie\Permission\Models\Permission::on('tenant')->whereIn('id', $permissions)->get();
-            $staff->syncPermissions($permissionModels);
+        // Назначаем роль сотруднику
+        if ($roleId) {
+            // Преобразуем строку в число, если необходимо
+            $roleId = is_string($roleId) ? (int) $roleId : $roleId;
+            
+            $role = \Spatie\Permission\Models\Role::on('tenant')
+                ->where('guard_name', 'web')
+                ->find($roleId);
+            if ($role) {
+                // Используем строковое имя роли для избежания конфликта guard
+                $staff->syncRoles([$role->name]);
+            }
         }
 
         return redirect()
@@ -152,30 +184,25 @@ class StaffController extends Controller
      */
     public function edit($id): Response
     {
-        // Убеждаемся, что разрешения созданы в tenant БД
-        $this->ensurePermissionsExist();
+        // Убеждаемся, что роли созданы
+        $this->ensureRolesExist();
         
-        $staff = Staff::with('permissions')->findOrFail($id);
-        $permissions = \Spatie\Permission\Models\Permission::on('tenant')
-            ->orderBy('name')
+        $staff = Staff::with('roles')->findOrFail($id);
+        
+        $roles = \Spatie\Permission\Models\Role::on('tenant')
+            ->whereIn('name', ['Мастер', 'Менеджер', 'Админ'])
+            ->orderByRaw("FIELD(name, 'Мастер', 'Менеджер', 'Админ')")
             ->get()
-            ->groupBy(function ($permission) {
-                // Группируем разрешения по модулям (первое слово)
-                $parts = explode(' ', $permission->name);
-                return $parts[0]; // bookings, services, staff, etc.
-            })
-            ->map(function ($group, $module) {
-                return $group->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                    ];
-                })->values();
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ];
             });
 
         return Inertia::render('Staff/Edit', [
             'staff' => $staff,
-            'permissions' => $permissions,
+            'roles' => $roles,
         ]);
     }
 
@@ -196,26 +223,94 @@ class StaffController extends Controller
             'phone' => ['nullable', 'string', 'max:20'],
             'specialization' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
-            'working_hours' => ['nullable', 'array'],
             'breaks' => ['nullable', 'array'],
             'holidays' => ['nullable', 'array'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['exists:tenant.permissions,id'],
+            'role_id' => ['nullable', 'exists:tenant.roles,id'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $permissions = $validated['permissions'] ?? null;
-        unset($validated['permissions']);
+        $roleId = $validated['role_id'] ?? null;
+        unset($validated['role_id']);
+        
+        $password = $validated['password'] ?? null;
+        unset($validated['password'], $validated['password_confirmation']);
 
         $staff->update($validated);
 
-        // Обновляем разрешения сотрудника, если они переданы
-        if ($permissions !== null) {
-            $permissionModels = \Spatie\Permission\Models\Permission::on('tenant')->whereIn('id', $permissions)->get();
-            $staff->syncPermissions($permissionModels);
+        // Обновляем User, если он существует
+        if ($staff->user_id) {
+            $user = \App\Models\User::find($staff->user_id);
+            if ($user) {
+                // Обновляем телефон, если он изменился
+                if (isset($validated['phone']) && $user->phone !== $validated['phone']) {
+                    $user->phone = $validated['phone'];
+                }
+                
+                // Обновляем имя, если оно изменилось
+                if (isset($validated['name']) && $user->name !== $validated['name']) {
+                    $user->name = $validated['name'];
+                }
+                
+                // Обновляем пароль, если он указан
+                if ($password) {
+                    $user->password = \Hash::make($password);
+                }
+                
+                $user->save();
+            }
+        } elseif (!empty($validated['phone'])) {
+            // Создаем User, если phone указан, но user_id отсутствует
+            $user = \App\Models\User::firstOrCreate(
+                ['phone' => $validated['phone']],
+                [
+                    'name' => $validated['name'],
+                    'email' => $validated['email'] ?? null,
+                    'password' => $password ? \Hash::make($password) : \Hash::make($validated['phone']),
+                    'role' => 'staff',
+                ]
+            );
+            
+            $staff->user_id = $user->id;
+            $staff->save();
+        }
+
+        // Обновляем роль сотрудника, если она передана
+        if ($roleId !== null) {
+            // Преобразуем строку в число, если необходимо
+            $roleId = is_string($roleId) ? (int) $roleId : $roleId;
+            
+            if ($roleId) {
+                $role = \Spatie\Permission\Models\Role::on('tenant')
+                    ->where('guard_name', 'web')
+                    ->find($roleId);
+                if ($role) {
+                    // Используем строковое имя роли для избежания конфликта guard
+                    $staff->syncRoles([$role->name]);
+                }
+            } else {
+                // Удаляем все роли, если role_id пустой
+                $staff->syncRoles([]);
+            }
         }
 
         return redirect()
             ->route('staff.index')
             ->with('success', 'Сотрудник обновлен!');
+    }
+
+    /**
+     * Удалить сотрудника
+     *
+     * @param int $id
+     * @return RedirectResponse
+     */
+    public function destroy($id): RedirectResponse
+    {
+        $staff = Staff::findOrFail($id);
+        $staff->delete();
+
+        return redirect()
+            ->route('staff.index')
+            ->with('success', 'Сотрудник удален!');
     }
 }

@@ -14,7 +14,15 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { PlusIcon, SearchIcon, Calendar as CalendarIcon, List, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { PlusIcon, SearchIcon, Calendar as CalendarIcon, List, ChevronLeft, ChevronRight, Clock, User, Scissors, Edit, Trash2 } from 'lucide-vue-next';
 import BookingCreateForm from '@/components/Forms/BookingCreateForm.vue';
 import type { Booking, Service, Staff } from '@/types';
 import { route } from '@/lib/routes';
@@ -31,6 +39,13 @@ interface Props {
     endDate?: string;
     services?: Service[];
     staff?: Staff[];
+    workingHours?: {
+        [key: string]: {
+            is_closed: boolean;
+            start: string;
+            end: string;
+        };
+    };
 }
 
 const props = defineProps<Props>();
@@ -38,6 +53,10 @@ const props = defineProps<Props>();
 const searchQuery = ref('');
 const currentView = ref<'calendar' | 'list'>(props.view || 'calendar');
 const isCreateSheetOpen = ref(false);
+const isEditSheetOpen = ref(false);
+const selectedBooking = ref<Booking | null>(null);
+const isDeleteDialogOpen = ref(false);
+const bookingToDelete = ref<Booking | null>(null);
 
 const openCreateSheet = () => {
     isCreateSheetOpen.value = true;
@@ -51,12 +70,71 @@ const closeCreateSheet = (open: boolean) => {
 
 const handleSuccess = () => {
     isCreateSheetOpen.value = false;
+    loadWeekBookings();
+};
+
+const openEditSheet = (booking: Booking) => {
+    selectedBooking.value = booking;
+    isEditSheetOpen.value = true;
+};
+
+const closeEditSheet = (open: boolean) => {
+    if (!open) {
+        isEditSheetOpen.value = false;
+        selectedBooking.value = null;
+    }
+};
+
+const handleEditSuccess = () => {
+    isEditSheetOpen.value = false;
+    selectedBooking.value = null;
+    loadWeekBookings();
 };
 
 // Для календарного вида
 const currentWeekStart = ref(props.startDate ? new Date(props.startDate) : getStartOfWeek(new Date()));
-const hours = Array.from({ length: 24 }, (_, i) => i);
 const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+// Вычисляем диапазон часов на основе рабочих часов
+const hours = computed(() => {
+    if (!props.workingHours) {
+        // Если нет рабочих часов, используем стандартный диапазон 8:00-22:00
+        return Array.from({ length: 15 }, (_, i) => i + 8);
+    }
+    
+    // Находим минимальное и максимальное время из всех дней недели
+    let minHour = 24;
+    let maxHour = 0;
+    
+    const dayMap: Record<string, string> = {
+        'monday': 'Пн',
+        'tuesday': 'Вт',
+        'wednesday': 'Ср',
+        'thursday': 'Чт',
+        'friday': 'Пт',
+        'saturday': 'Сб',
+        'sunday': 'Вс',
+    };
+    
+    Object.keys(props.workingHours).forEach(dayKey => {
+        const dayData = props.workingHours![dayKey];
+        if (!dayData.is_closed && dayData.start && dayData.end) {
+            const startHour = parseInt(dayData.start.split(':')[0]);
+            const endHour = parseInt(dayData.end.split(':')[0]);
+            
+            if (startHour < minHour) minHour = startHour;
+            if (endHour > maxHour) maxHour = endHour;
+        }
+    });
+    
+    // Если не нашли рабочие часы, используем стандартный диапазон
+    if (minHour === 24 || maxHour === 0) {
+        return Array.from({ length: 15 }, (_, i) => i + 8);
+    }
+    
+    // Создаем массив часов от минимального до максимального
+    return Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
+});
 
 function getStartOfWeek(date: Date): Date {
     const d = new Date(date);
@@ -78,10 +156,16 @@ function getWeekDates(startDate: Date): Date[] {
 const weekDates = computed(() => getWeekDates(currentWeekStart.value));
 
 const bookingsArray = computed(() => {
+    let bookings: Booking[] = [];
     if (Array.isArray(props.bookings)) {
-        return props.bookings;
+        bookings = props.bookings;
+    } else {
+        bookings = props.bookings?.data || [];
     }
-    return props.bookings?.data || [];
+    // Фильтруем отмененные и no_show из календаря
+    return bookings.filter((booking: Booking) => 
+        booking.status !== 'cancelled' && booking.status !== 'no_show'
+    );
 });
 
 const bookingsByDateAndTime = computed(() => {
@@ -102,8 +186,64 @@ const bookingsByDateAndTime = computed(() => {
         grouped[dateKey][hourKey].push(booking);
     });
     
+    // Сортируем бронирования по времени начала и сотруднику для правильного отображения
+    Object.keys(grouped).forEach(dateKey => {
+        Object.keys(grouped[dateKey]).forEach(hourKey => {
+            grouped[dateKey][hourKey].sort((a, b) => {
+                const timeDiff = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+                if (timeDiff !== 0) return timeDiff;
+                // Если время одинаковое, сортируем по ID сотрудника
+                const staffA = a.staff?.id || 0;
+                const staffB = b.staff?.id || 0;
+                return staffA - staffB;
+            });
+        });
+    });
+    
     return grouped;
 });
+
+// Функция для определения позиции карточки (для множественных записей на одно время)
+const getBookingPosition = (booking: Booking, bookingIndex: number, allBookings: Booking[]) => {
+    const bookingStart = new Date(booking.start_time).getTime();
+    const bookingEnd = new Date(booking.end_time).getTime();
+    
+    // Находим все записи, которые перекрываются по времени с текущей
+    const overlappingIndices: number[] = [];
+    allBookings.forEach((b, idx) => {
+        if (idx === bookingIndex) return;
+        const bStart = new Date(b.start_time).getTime();
+        const bEnd = new Date(b.end_time).getTime();
+        // Проверяем перекрытие: начало одной записи меньше конца другой и наоборот
+        if (bStart < bookingEnd && bEnd > bookingStart) {
+            overlappingIndices.push(idx);
+        }
+    });
+    
+    // Если есть перекрывающиеся записи, располагаем их рядом
+    if (overlappingIndices.length > 0) {
+        // Создаем группу перекрывающихся записей (включая текущую)
+        const group = [bookingIndex, ...overlappingIndices].sort((a, b) => a - b);
+        const positionInGroup = group.indexOf(bookingIndex);
+        const totalInGroup = group.length;
+        const width = 100 / totalInGroup;
+        const left = positionInGroup * width;
+        
+        return {
+            left: `${left}%`,
+            width: `${width}%`,
+            zIndex: bookingIndex + 1,
+        };
+    }
+    
+    // Если нет перекрытий, используем полную ширину
+    return {
+        left: '2px',
+        right: '2px',
+        width: 'calc(100% - 4px)',
+        zIndex: bookingIndex + 1,
+    };
+};
 
 const formatDate = (date: string | Date) => {
     const d = date instanceof Date ? date : new Date(date);
@@ -126,7 +266,9 @@ const formatDateKey = (date: Date) => {
     return date.toISOString().split('T')[0];
 };
 
-const statusLabels = {
+type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+
+const statusLabels: Record<BookingStatus, string> = {
     pending: 'Ожидает',
     confirmed: 'Подтверждено',
     cancelled: 'Отменено',
@@ -134,25 +276,40 @@ const statusLabels = {
     no_show: 'Не явился',
 };
 
-const statusVariants = {
+const statusVariants: Record<BookingStatus, 'secondary' | 'default' | 'destructive'> = {
     pending: 'secondary',
     confirmed: 'default',
     cancelled: 'destructive',
     completed: 'default',
     no_show: 'destructive',
-} as const;
-
-const statusColors = {
-    pending: 'bg-yellow-100 border-yellow-300 text-yellow-800',
-    confirmed: 'bg-green-100 border-green-300 text-green-800',
-    cancelled: 'bg-red-100 border-red-300 text-red-800',
-    completed: 'bg-blue-100 border-blue-300 text-blue-800',
-    no_show: 'bg-gray-100 border-gray-300 text-gray-800',
 };
 
-const handleDelete = (booking: Booking) => {
-    if (confirm('Вы уверены, что хотите удалить это бронирование?')) {
-        router.delete(route('bookings.destroy', booking.id));
+const statusColors = {
+    pending: 'bg-yellow-50 border-l-yellow-400 text-yellow-900 hover:bg-yellow-100',
+    confirmed: 'bg-blue-50 border-l-blue-400 text-blue-900 hover:bg-blue-100',
+    cancelled: 'bg-red-50 border-l-red-400 text-red-900 hover:bg-red-100',
+    completed: 'bg-green-50 border-l-green-400 text-green-900 hover:bg-green-100',
+    no_show: 'bg-gray-50 border-l-gray-400 text-gray-900 hover:bg-gray-100',
+};
+
+const openDeleteDialog = (booking: Booking) => {
+    bookingToDelete.value = booking;
+    isDeleteDialogOpen.value = true;
+};
+
+const closeDeleteDialog = () => {
+    isDeleteDialogOpen.value = false;
+    bookingToDelete.value = null;
+};
+
+const confirmDelete = () => {
+    if (bookingToDelete.value) {
+        router.delete(route('bookings.destroy', bookingToDelete.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeDeleteDialog();
+            },
+        });
     }
 };
 
@@ -304,25 +461,45 @@ const getBookingHeight = (booking: Booking) => {
                                 <div
                                     v-for="(day, dayIndex) in weekDates"
                                     :key="dayIndex"
-                                    class="relative border-l border-b min-h-[60px] p-1"
-                                    :class="day.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''"
+                                    class="relative border-l border-b min-h-[60px] p-0.5"
+                                    :class="day.toDateString() === new Date().toDateString() ? 'bg-blue-50/30' : ''"
                                 >
-                                    <div
-                                        v-for="booking in (bookingsByDateAndTime[formatDateKey(day)]?.[String(hour)] || [])"
+                                    <template
+                                        v-for="(booking, bookingIndex) in (bookingsByDateAndTime[formatDateKey(day)]?.[String(hour)] || [])"
                                         :key="booking.id"
-                                        class="absolute left-1 right-1 rounded border p-1 text-xs cursor-pointer hover:shadow-md transition-shadow"
-                                        :class="statusColors[booking.status]"
-                                        :style="{
-                                            top: getBookingTop(booking) + '%',
-                                            height: getBookingHeight(booking) + '%',
-                                            minHeight: '40px',
-                                        }"
-                                        @click="router.visit(route('bookings.show', booking.id))"
                                     >
-                                        <div class="font-medium truncate">{{ booking.service?.name || 'Услуга' }}</div>
-                                        <div class="text-xs opacity-75 truncate">{{ booking.customer?.name || 'Клиент' }}</div>
-                                        <div class="text-xs opacity-75">{{ formatTime(booking.start_time) }}</div>
-                                    </div>
+                                        <div
+                                            class="absolute rounded-md border-l-2 p-1.5 text-[10px] cursor-pointer hover:shadow-md hover:z-50 transition-all overflow-hidden"
+                                            :class="statusColors[booking.status]"
+                                            :style="{
+                                                top: getBookingTop(booking) + '%',
+                                                height: getBookingHeight(booking) + '%',
+                                                minHeight: '36px',
+                                                maxHeight: '100%',
+                                                ...getBookingPosition(booking, bookingIndex, bookingsByDateAndTime[formatDateKey(day)]?.[String(hour)] || []),
+                                            }"
+                                            @click="openEditSheet(booking)"
+                                        >
+                                            <div class="flex items-start gap-1.5 h-full">
+                                                <div class="flex-shrink-0 mt-0.5">
+                                                    <Scissors class="h-2.5 w-2.5 opacity-70" />
+                                                </div>
+                                                <div class="flex-1 min-w-0 space-y-0.5">
+                                                    <div class="font-semibold leading-tight truncate">
+                                                        {{ booking.service?.name || 'Услуга' }}
+                                                    </div>
+                                                    <div class="flex items-center gap-1 text-[9px] opacity-80">
+                                                        <User class="h-2 w-2 flex-shrink-0" />
+                                                        <span class="truncate">{{ booking.staff?.name || 'Без мастера' }}</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1 text-[9px] opacity-70">
+                                                        <Clock class="h-2 w-2 flex-shrink-0" />
+                                                        <span>{{ formatTime(booking.start_time) }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -335,8 +512,7 @@ const getBookingHeight = (booking: Booking) => {
                 <CardHeader>
                     <div class="flex items-center justify-between">
                         <div>
-                            <CardTitle>Все бронирования</CardTitle>
-                            <CardDescription>Список всех бронирований</CardDescription>
+                            
                         </div>
                         <div class="flex items-center gap-2">
                             <div class="relative">
@@ -384,24 +560,30 @@ const getBookingHeight = (booking: Booking) => {
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge :variant="statusVariants[booking.status]">
-                                        {{ statusLabels[booking.status] }}
+                                    <Badge :variant="statusVariants[booking.status as BookingStatus] || 'secondary'">
+                                        {{ statusLabels[booking.status as BookingStatus] || booking.status }}
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {{ booking.total_price?.toLocaleString('ru-RU') }} ₽
+                                    {{ booking.total_price?.toLocaleString('ru-RU') }} ₸
                                 </TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-2">
-                                        <Link :href="route('bookings.show', booking.id)">
-                                            <Button variant="ghost" size="sm">Просмотр</Button>
-                                        </Link>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            @click="handleDelete(booking)"
+                                            @click="openEditSheet(booking)"
+                                            class="h-8 w-8 p-0"
                                         >
-                                            Удалить
+                                            <Edit class="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="openDeleteDialog(booking)"
+                                            class="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </div>
                                 </TableCell>
@@ -440,24 +622,70 @@ const getBookingHeight = (booking: Booking) => {
 
             <!-- Sheet для создания бронирования -->
             <Sheet :open="isCreateSheetOpen" @update:open="closeCreateSheet">
-                <SheetContent side="right" class="overflow-y-auto">
-                    <SheetHeader>
-                        <SheetTitle>Новое бронирование</SheetTitle>
-                        <SheetDescription>
-                            Создайте новое бронирование для клиента
-                        </SheetDescription>
+                <SheetContent side="right" class="flex flex-col p-0">
+                    <SheetHeader class="border-b p-4">
+                        <SheetTitle><h4 class="text-lg font-semibold">Новая бронь</h4></SheetTitle>
                     </SheetHeader>
 
-                    <div class="mt-6">
+                    <div class="flex-1 overflow-y-auto">
                         <BookingCreateForm
                             :services="props.services"
                             :staff="props.staff"
+                            :working-hours="props.workingHours"
                             :on-success="handleSuccess"
                             :on-cancel="() => closeCreateSheet(false)"
                         />
                     </div>
                 </SheetContent>
             </Sheet>
+
+            <!-- Sheet для редактирования бронирования -->
+            <Sheet :open="isEditSheetOpen" @update:open="closeEditSheet">
+                <SheetContent side="right" class="flex flex-col p-0">
+                    <SheetHeader class="border-b p-4">
+                        <SheetTitle><h4 class="text-lg font-semibold">Редактировать бронирование</h4></SheetTitle>
+                        <SheetDescription v-if="selectedBooking">
+                            {{ selectedBooking.service?.name }} - {{ formatTime(selectedBooking.start_time) }}
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div class="flex-1 overflow-y-auto">
+                        <BookingCreateForm
+                            v-if="selectedBooking"
+                            :booking="selectedBooking"
+                            :services="props.services"
+                            :staff="props.staff"
+                            :working-hours="props.workingHours"
+                            :on-success="handleEditSuccess"
+                            :on-cancel="() => closeEditSheet(false)"
+                        />
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            <!-- Dialog для подтверждения удаления -->
+            <Dialog :open="isDeleteDialogOpen" @update:open="(open) => !open && closeDeleteDialog()">
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Подтверждение удаления</DialogTitle>
+                        <DialogDescription>
+                            Вы уверены, что хотите удалить бронирование
+                            <span v-if="bookingToDelete" class="font-semibold">
+                                #{{ bookingToDelete.booking_number }}
+                            </span>?
+                            Это действие нельзя отменить.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" @click="closeDeleteDialog">
+                            Отмена
+                        </Button>
+                        <Button variant="destructive" @click="confirmDelete">
+                            Удалить
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     </AppLayout>
 </template>

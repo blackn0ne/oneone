@@ -288,7 +288,7 @@ const statusVariants = {
                                 <TableCell>
                                     {{ new Date(billing.created_at).toLocaleDateString('ru-RU') }}
                                 </TableCell>
-                                <TableCell>{{ billing.amount.toLocaleString('ru-RU') }} ₽</TableCell>
+                                <TableCell>{{ billing.amount.toLocaleString('ru-RU') }} ₸</TableCell>
                                 <TableCell>
                                     <Badge :variant="billing.status === 'paid' ? 'default' : 'secondary'">
                                         {{ billing.status }}

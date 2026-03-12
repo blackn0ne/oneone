@@ -16,17 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $duration
  * @property float $price
  * @property int|null $category_id
- * @property int|null $location_id
+ * @property int|null $business_id
  * @property bool $is_active
  * @property string $booking_mode
- * @property int $buffer_time_before
- * @property int $buffer_time_after
- * @property int $prepare_time
- * @property int|null $max_participants
- * @property int|null $min_duration
- * @property int|null $max_duration
- * @property bool $allow_custom_duration
- * @property bool $allow_recurring
  * @property array|null $metadata
  */
 class Service extends Model
@@ -37,33 +29,17 @@ class Service extends Model
         'duration', // в минутах
         'price',
         'category_id',
-        'location_id',
+        'business_id',
         'is_active',
         'booking_mode', // service, hotel, event, online, rental, chauffeur
-        'buffer_time_before',
-        'buffer_time_after',
-        'prepare_time',
-        'max_participants',
-        'min_duration',
-        'max_duration',
-        'allow_custom_duration',
-        'allow_recurring',
         'metadata',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'allow_custom_duration' => 'boolean',
-        'allow_recurring' => 'boolean',
         'metadata' => 'array',
         'price' => 'decimal:2',
         'duration' => 'integer',
-        'buffer_time_before' => 'integer',
-        'buffer_time_after' => 'integer',
-        'prepare_time' => 'integer',
-        'max_participants' => 'integer',
-        'min_duration' => 'integer',
-        'max_duration' => 'integer',
     ];
 
     public function staff(): BelongsToMany
@@ -76,8 +52,8 @@ class Service extends Model
         return $this->hasMany(Booking::class);
     }
 
-    public function location(): BelongsTo
+    public function business(): BelongsTo
     {
-        return $this->belongsTo(Location::class);
+        return $this->belongsTo(Business::class, 'business_id');
     }
 }

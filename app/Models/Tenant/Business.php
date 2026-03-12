@@ -3,44 +3,71 @@
 namespace App\Models\Tenant;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Модель бизнес-настроек tenant
+ * Модель точки продаж
+ *
+ * @property int $id
+ * @property string $name
+ * @property string|null $address
+ * @property string|null $phone
+ * @property string|null $email
+ * @property bool $is_active
+ * @property array|null $metadata
  */
 class Business extends Model
 {
-    protected $connection = 'tenant';
-
     protected $table = 'business';
 
     protected $fillable = [
-        'company_name',
-        'company_slogan',
-        'logo',
-        'favicon',
+        'name',
+        'address',
         'phone',
         'email',
-        'country',
-        'city',
-        'address',
-        'working_hours',
-        'social_links',
-        'global_currency',
-        'default_language',
-        'languages',
+        'is_active',
+        'metadata',
     ];
 
     protected $casts = [
-        'working_hours' => 'array',
-        'social_links' => 'array',
-        'languages' => 'array',
+        'is_active' => 'boolean',
+        'metadata' => 'array',
     ];
 
-    /**
-     * Получить единственную запись настроек (singleton)
-     */
-    public static function getInstance(): ?self
+    public function services(): HasMany
     {
-        return static::first();
+        return $this->hasMany(Service::class, 'business_id');
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'business_id');
+    }
+
+    public function staff(): HasMany
+    {
+        return $this->hasMany(Staff::class, 'business_id');
+    }
+
+    public function workingHours(): HasMany
+    {
+        return $this->hasMany(WorkingHour::class, 'business_id');
+    }
+
+    /**
+     * Scope: только активные бизнесы
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope: только неактивные бизнесы
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('is_active', false);
     }
 }

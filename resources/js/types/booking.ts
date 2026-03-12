@@ -4,7 +4,7 @@ export interface Booking {
     service_id: number;
     staff_id?: number;
     customer_id: number;
-    location_id?: number;
+    business_id?: number;
     status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
     booking_mode: 'service' | 'hotel' | 'event' | 'online' | 'rental' | 'chauffeur';
     start_time: string;
@@ -27,7 +27,7 @@ export interface Booking {
     service?: Service;
     staff?: Staff;
     customer?: Customer;
-    location?: Location;
+    business?: Business;
     created_at: string;
     updated_at: string;
 }
@@ -39,19 +39,11 @@ export interface Service {
     duration: number;
     price: number;
     category_id?: number;
-    location_id?: number;
+    business_id?: number;
     is_active: boolean;
     booking_mode: 'service' | 'hotel' | 'event' | 'online' | 'rental' | 'chauffeur';
-    buffer_time_before: number;
-    buffer_time_after: number;
-    prepare_time: number;
-    max_participants?: number;
-    min_duration?: number;
-    max_duration?: number;
-    allow_custom_duration: boolean;
-    allow_recurring: boolean;
     metadata?: Record<string, any>;
-    location?: Location;
+    business?: Business;
     created_at: string;
     updated_at: string;
 }
@@ -66,7 +58,6 @@ export interface Staff {
     specialization?: string;
     is_active: boolean;
     locations?: number[];
-    working_hours?: Record<string, any>;
     breaks?: Record<string, any>;
     holidays?: string[];
     bookings_count?: number;
@@ -90,7 +81,7 @@ export interface Customer {
     updated_at: string;
 }
 
-export interface Location {
+export interface Business {
     id: number;
     name: string;
     address?: string;
@@ -98,6 +89,13 @@ export interface Location {
     email?: string;
     is_active: boolean;
     metadata?: Record<string, any>;
+    working_hours?: {
+        [key: string]: {
+            is_closed: boolean;
+            start: string;
+            end: string;
+        };
+    };
     created_at: string;
     updated_at: string;
 }

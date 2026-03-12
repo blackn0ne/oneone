@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { route } from '@/lib/routes';
 import { useTranslations } from '@/composables/useTranslations';
 
@@ -15,7 +15,8 @@ interface User {
     id: number;
     name: string;
     email: string;
-    is_super_admin: boolean;
+    role?: 'super_admin' | 'admin' | 'staff';
+    is_super_admin?: boolean;
     roles?: Array<{ name: string }>;
 }
 
@@ -30,7 +31,7 @@ const form = useForm({
     email: props.user.email,
     password: '',
     password_confirmation: '',
-    is_super_admin: props.user.is_super_admin,
+    role: (props.user.role || (props.user.is_super_admin ? 'super_admin' : 'staff')) as 'super_admin' | 'admin' | 'staff',
     roles: props.user.roles?.map(r => r.name) || [] as string[],
 });
 
@@ -96,14 +97,21 @@ const submit = () => {
                             </div>
                         </div>
 
-                        <div class="flex items-center space-x-2">
-                            <Switch
-                                id="is_super_admin"
-                                v-model:checked="form.is_super_admin"
-                            />
-                            <Label for="is_super_admin" class="cursor-pointer">
-                                {{ t('users.is_super_admin', 'Супер-администратор') }}
-                            </Label>
+                        <div class="space-y-2">
+                            <Label for="role">{{ t('users.role', 'Роль') }} *</Label>
+                            <Select v-model="form.role" required>
+                                <SelectTrigger id="role">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="staff">{{ t('users.role_staff', 'Сотрудник') }}</SelectItem>
+                                    <SelectItem value="admin">{{ t('users.role_admin', 'Администратор (для tenant)') }}</SelectItem>
+                                    <SelectItem value="super_admin">{{ t('users.role_super_admin', 'Супер-администратор') }}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p v-if="form.errors.role" class="text-sm text-destructive">
+                                {{ form.errors.role }}
+                            </p>
                         </div>
                     </CardContent>
                     <CardFooter class="flex justify-end gap-2">

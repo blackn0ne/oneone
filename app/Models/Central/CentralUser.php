@@ -25,7 +25,7 @@ class CentralUser extends Authenticatable
         'name',
         'email',
         'password',
-        'is_super_admin',
+        'role',
     ];
 
     /**
@@ -51,7 +51,6 @@ class CentralUser extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
-            'is_super_admin' => 'boolean',
         ];
     }
 
@@ -60,6 +59,22 @@ class CentralUser extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
-        return $this->is_super_admin || $this->hasRole('super_admin');
+        return $this->role === 'super_admin' || $this->hasRole('super_admin');
+    }
+
+    /**
+     * Проверка, является ли пользователь админом (для tenant)
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin' || $this->hasRole('admin');
+    }
+
+    /**
+     * Проверка, является ли пользователь обычным сотрудником
+     */
+    public function isStaff(): bool
+    {
+        return $this->role === 'staff';
     }
 }

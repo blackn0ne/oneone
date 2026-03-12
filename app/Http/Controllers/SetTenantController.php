@@ -24,7 +24,7 @@ class SetTenantController extends Controller
         }
 
         // Суперадмин может выбрать любую компанию
-        if ($user->is_super_admin || $user->hasRole('super_admin')) {
+        if ($user->isSuperAdmin()) {
             // OK
         } else {
             // Проверяем, что у пользователя есть доступ (staff)

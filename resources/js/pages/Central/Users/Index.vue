@@ -15,7 +15,8 @@ interface User {
     id: number;
     name: string;
     email: string;
-    is_super_admin: boolean;
+    role?: 'super_admin' | 'admin' | 'staff';
+    is_super_admin?: boolean;
     roles?: Array<{ name: string }>;
     tenant_connections?: Array<{
         tenant_id: string;
@@ -79,7 +80,7 @@ const props = defineProps<Props>();
                                 <TableCell>{{ user.email }}</TableCell>
                                 <TableCell>
                                     <div class="flex flex-wrap gap-1">
-                                        <Badge v-if="user.is_super_admin" variant="default">
+                                        <Badge v-if="user.role === 'super_admin' || user.is_super_admin" variant="default">
                                             {{ t('users.super_admin', 'Супер-админ') }}
                                         </Badge>
                                         <Badge v-for="role in user.roles" :key="role.name" variant="secondary">

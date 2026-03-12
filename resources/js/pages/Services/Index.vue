@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { PlusIcon, Eye, Pencil, Trash2 } from 'lucide-vue-next';
 import ServiceCreateForm from '@/components/Forms/ServiceCreateForm.vue';
-import type { Service, Location } from '@/types';
+import type { Service, Business } from '@/types';
 import { route } from '@/lib/routes';
 
 interface Props {
@@ -25,7 +25,7 @@ interface Props {
         current_page: number;
         last_page: number;
     };
-    locations?: Location[];
+    businesses?: Business[];
 }
 
 const props = defineProps<Props>();
@@ -96,7 +96,7 @@ const handleSuccess = () => {
                                     {{ service.description || '-' }}
                                 </TableCell>
                                 <TableCell>{{ service.duration }} мин</TableCell>
-                                <TableCell>{{ service.price?.toLocaleString('ru-RU') }} ₽</TableCell>
+                                <TableCell>{{ service.price?.toLocaleString('ru-RU') }} ₸</TableCell>
                                 <TableCell>
                                     <Badge variant="outline">{{ service.booking_mode }}</Badge>
                                 </TableCell>
@@ -140,17 +140,14 @@ const handleSuccess = () => {
 
             <!-- Sheet для создания услуги -->
             <Sheet :open="isCreateSheetOpen" @update:open="closeCreateSheet">
-                <SheetContent side="right" class="overflow-y-auto">
-                    <SheetHeader>
-                        <SheetTitle>Новая услуга</SheetTitle>
-                        <SheetDescription>
-                            Создайте новую услугу для бронирования
-                        </SheetDescription>
+                <SheetContent side="right" class="flex flex-col p-0">
+                    <SheetHeader class="border-b p-4">
+                        <SheetTitle><h4 class="text-lg font-semibold">Новая услуга</h4></SheetTitle>
                     </SheetHeader>
 
-                    <div class="mt-6">
+                    <div class="flex-1 overflow-y-auto">
                         <ServiceCreateForm
-                            :locations="props.locations || []"
+                            :businesses="props.businesses || []"
                             :on-success="handleSuccess"
                             :on-cancel="() => closeCreateSheet(false)"
                         />

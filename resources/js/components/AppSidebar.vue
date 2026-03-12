@@ -73,7 +73,7 @@ const tenantNavItems: NavItem[] = [
         icon: BarChart3,
     },
     {
-        title: 'Бизнес',
+        title: 'Точки продаж',
         href: route('business.index'),
         icon: Building2,
     },

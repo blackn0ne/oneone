@@ -41,8 +41,9 @@ class BookingController extends Controller
             $startDate = $request->input('start_date', now()->startOfWeek()->toDateString());
             $endDate = $request->input('end_date', now()->endOfWeek()->toDateString());
             
-            $bookings = Booking::with(['service', 'customer', 'staff', 'location'])
+            $bookings = Booking::with(['service', 'customer', 'staff', 'business'])
                 ->whereBetween('start_time', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
+                ->whereNotIn('status', [BookingStatus::CANCELLED->value, BookingStatus::NO_SHOW->value])
                 ->orderBy('start_time')
                 ->get()
                 ->map(function ($booking) {
@@ -50,9 +51,9 @@ class BookingController extends Controller
                         'id' => $booking->id,
                         'booking_number' => $booking->booking_number,
                         'service' => $booking->service ? ['id' => $booking->service->id, 'name' => $booking->service->name] : null,
-                        'customer' => $booking->customer ? ['id' => $booking->customer->id, 'name' => $booking->customer->name] : null,
+                        'customer' => $booking->customer ? ['id' => $booking->customer->id, 'name' => $booking->customer->name, 'phone' => $booking->customer->phone] : null,
                         'staff' => $booking->staff ? ['id' => $booking->staff->id, 'name' => $booking->staff->name] : null,
-                        'location' => $booking->location ? ['id' => $booking->location->id, 'name' => $booking->location->name] : null,
+                        'business' => $booking->business ? ['id' => $booking->business->id, 'name' => $booking->business->name] : null,
                         'status' => $booking->status,
                         'start_time' => $booking->start_time->toIso8601String(),
                         'end_time' => $booking->end_time->toIso8601String(),
@@ -63,7 +64,7 @@ class BookingController extends Controller
                 });
         } else {
             // Для списка используем пагинацию
-            $bookings = Booking::with(['service', 'customer', 'staff', 'location'])
+            $bookings = Booking::with(['service', 'customer', 'staff', 'business'])
                 ->latest()
                 ->paginate(15);
         }
@@ -71,6 +72,15 @@ class BookingController extends Controller
         // Данные для формы создания (нужны всегда)
         $services = Service::where('is_active', true)->get();
         $staff = Staff::where('is_active', true)->get();
+        
+        // Получаем рабочие часы бизнеса для календаря
+        $business = \App\Models\Tenant\Business::where('is_active', true)->first();
+        $workingHours = null;
+        if ($business) {
+            $business->load('workingHours');
+            $businessService = app(\App\Services\Tenant\BusinessService::class);
+            $workingHours = $businessService->formatWorkingHours($business->workingHours);
+        }
 
         return Inertia::render('Bookings/Index', [
             'bookings' => $bookings,
@@ -79,6 +89,7 @@ class BookingController extends Controller
             'endDate' => $endDate,
             'services' => $services,
             'staff' => $staff,
+            'workingHours' => $workingHours,
         ]);
     }
 
@@ -93,11 +104,21 @@ class BookingController extends Controller
         $services = Service::where('is_active', true)->get();
         $staff = Staff::where('is_active', true)->get();
         $customers = Customer::latest()->limit(50)->get();
+        
+        // Получаем рабочие часы бизнеса для формы создания
+        $business = \App\Models\Tenant\Business::where('is_active', true)->first();
+        $workingHours = null;
+        if ($business) {
+            $business->load('workingHours');
+            $businessService = app(\App\Services\Tenant\BusinessService::class);
+            $workingHours = $businessService->formatWorkingHours($business->workingHours);
+        }
 
         return Inertia::render('Bookings/Create', [
             'services' => $services,
             'staff' => $staff,
             'customers' => $customers,
+            'workingHours' => $workingHours,
         ]);
     }
 
@@ -114,7 +135,8 @@ class BookingController extends Controller
             'staff_id' => ['nullable', 'exists:staff,id'],
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:20'],
-            'location_id' => ['nullable', 'exists:locations,id'],
+            'business_id' => ['nullable', 'exists:business,id'],
+            'status' => ['nullable', 'in:pending,confirmed,cancelled,completed,no_show'],
             'start_time' => ['required', 'date'],
             'end_time' => ['required', 'date', 'after:start_time'],
             'duration' => ['nullable', 'integer', 'min:1'],
@@ -147,8 +169,7 @@ class BookingController extends Controller
 
             $booking = $this->bookingService->createBooking($validated);
 
-            return redirect()
-                ->route('bookings.index')
+            return redirect('/bookings')
                 ->with('success', 'Бронирование успешно создано!');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -163,7 +184,7 @@ class BookingController extends Controller
      */
     public function show(Booking $booking): Response
     {
-        $booking->load(['service', 'customer', 'staff', 'location']);
+        $booking->load(['service', 'customer', 'staff', 'business']);
 
         return Inertia::render('Bookings/Show', [
             'booking' => $booking,
@@ -177,8 +198,10 @@ class BookingController extends Controller
      * @param Booking $booking
      * @return RedirectResponse
      */
-    public function update(Request $request, Booking $booking): RedirectResponse
+    public function update(Request $request, $id): RedirectResponse
     {
+        $booking = Booking::findOrFail($id);
+        
         $validated = $request->validate([
             'status' => ['sometimes', 'in:' . implode(',', BookingStatus::values())],
             'start_time' => ['sometimes', 'date'],
@@ -188,23 +211,22 @@ class BookingController extends Controller
 
         $booking->update($validated);
 
-        return redirect()
-            ->route('bookings.show', $booking)
+        return redirect('/bookings')
             ->with('success', 'Бронирование обновлено!');
     }
 
     /**
      * Удалить бронирование
      *
-     * @param Booking $booking
+     * @param int $id
      * @return RedirectResponse
      */
-    public function destroy(Booking $booking): RedirectResponse
+    public function destroy($id): RedirectResponse
     {
+        $booking = Booking::findOrFail($id);
         $booking->delete();
 
-        return redirect()
-            ->route('bookings.index')
+        return redirect('/bookings')
             ->with('success', 'Бронирование удалено!');
     }
 }

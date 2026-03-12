@@ -98,7 +98,7 @@ const submit = () => {
                             <div class="flex items-center space-x-2 pt-8">
                                 <Switch
                                     id="is_active"
-                                    v-model:checked="form.is_active"
+                                    v-model="form.is_active"
                                 />
                                 <Label for="is_active" class="cursor-pointer">
                                     Язык активен

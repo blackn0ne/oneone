@@ -15,7 +15,7 @@ const form = useForm({
     slug: '',
     description: '',
     price: '',
-    currency: 'USD',
+    currency: 'KZT',
     interval: 'monthly',
     features: null,
     is_active: true,
@@ -134,9 +134,10 @@ const submit = () => {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="USD">USD</SelectItem>
-                                        <SelectItem value="EUR">EUR</SelectItem>
-                                        <SelectItem value="RUB">RUB</SelectItem>
+                                        <SelectItem value="KZT">KZT (₸)</SelectItem>
+                                        <SelectItem value="USD">USD ($)</SelectItem>
+                                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                                        <SelectItem value="RUB">RUB (₽)</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <p v-if="form.errors.currency" class="text-sm text-destructive">
@@ -182,7 +183,7 @@ const submit = () => {
                             <div class="flex items-center space-x-2 pt-8">
                                 <Switch
                                     id="is_active"
-                                    v-model:checked="form.is_active"
+                                    v-model="form.is_active"
                                 />
                                 <Label for="is_active" class="cursor-pointer">
                                     План активен

@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2Icon, UsersIcon, DollarSignIcon, CalendarIcon } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Building2Icon, UsersIcon, DollarSignIcon, CalendarIcon, Globe, LayoutDashboard } from 'lucide-vue-next';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface Stats {
     total_tenants: number;
@@ -44,6 +51,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const goToTenantPanel = (tenantId: string) => {
+    router.visit(`/set-tenant/${tenantId}`);
+};
 </script>
 
 <template>
@@ -135,18 +146,46 @@ const props = defineProps<Props>();
                                     <Badge :variant="tenant.status === 'active' ? 'default' : 'secondary'">
                                         {{ tenant.status }}
                                     </Badge>
-                                    <a
-                                        :href="`/${tenant.id}`"
-                                        class="text-sm text-primary hover:underline"
-                                    >
-                                        Сайт
-                                    </a>
-                                    <a
-                                        :href="`/set-tenant/${tenant.id}`"
-                                        class="text-sm text-primary hover:underline"
-                                    >
-                                        Панель
-                                    </a>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger as-child>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    class="h-8 w-8"
+                                                    :as-child="true"
+                                                >
+                                                    <a
+                                                        :href="`/${tenant.id}`"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <Globe class="h-4 w-4" />
+                                                    </a>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Открыть сайт</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger as-child>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    class="h-8 w-8"
+                                                    @click="goToTenantPanel(tenant.id)"
+                                                >
+                                                    <LayoutDashboard class="h-4 w-4" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Перейти в панель</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </div>
                             </div>
                             <p v-if="recentTenants.length === 0" class="text-muted-foreground text-sm">

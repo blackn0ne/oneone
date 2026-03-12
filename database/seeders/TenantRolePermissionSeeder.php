@@ -62,59 +62,58 @@ class TenantRolePermissionSeeder extends Seeder
             'manage all',
         ];
 
+        // Устанавливаем подключение для моделей Permission и Role
+        $connection = \DB::getDefaultConnection();
+        
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+            Permission::on($connection)->firstOrCreate(
+                ['name' => $permission, 'guard_name' => 'web']
+            );
         }
 
         // Создаем роли для tenant
         $roles = [
-            'admin' => [
-                'name' => 'admin',
-                'permissions' => ['manage all'],
+            'Мастер' => [
+                'name' => 'Мастер',
+                'permissions' => [
+                    'view bookings', // только свои бронирования
+                    'edit bookings', // только статус своих бронирований
+                ],
             ],
-            'manager' => [
-                'name' => 'manager',
+            'Менеджер' => [
+                'name' => 'Менеджер',
                 'permissions' => [
                     'view bookings', 'create bookings', 'edit bookings', 'delete bookings', 'cancel bookings',
                     'view services', 'create services', 'edit services', 'delete services',
                     'view staff', 'create staff', 'edit staff', 'delete staff',
                     'view customers', 'create customers', 'edit customers', 'delete customers',
-                    'view locations', 'create locations', 'edit locations', 'delete locations',
-                    'view settings', 'edit settings',
-                    'view reports',
+                    'view business', 'create business', 'edit business', 'delete business',
+                    // НЕТ: view settings, edit settings, view reports
                 ],
             ],
-            'staff' => [
-                'name' => 'staff',
-                'permissions' => [
-                    'view bookings', 'create bookings', 'edit bookings',
-                    'view services',
-                    'view customers', 'create customers', 'edit customers',
-                    'view locations',
-                ],
-            ],
-            'viewer' => [
-                'name' => 'viewer',
-                'permissions' => [
-                    'view bookings',
-                    'view services',
-                    'view staff',
-                    'view customers',
-                    'view locations',
-                    'view reports',
-                ],
+            'Админ' => [
+                'name' => 'Админ',
+                'permissions' => ['manage all'], // все разрешения
             ],
         ];
 
         foreach ($roles as $roleData) {
-            $role = Role::firstOrCreate(['name' => $roleData['name'], 'guard_name' => 'web']);
+            $role = Role::on($connection)->firstOrCreate(
+                ['name' => $roleData['name'], 'guard_name' => 'web']
+            );
             
             // Назначаем права
-            $permissions = Permission::whereIn('name', $roleData['permissions'])->get();
+            $permissions = Permission::on($connection)
+                ->whereIn('name', $roleData['permissions'])
+                ->where('guard_name', 'web')
+                ->get();
             $role->syncPermissions($permissions);
         }
 
-        $this->command->info('Tenant роли и права созданы успешно!');
-        $this->command->info('Роли: ' . implode(', ', array_keys($roles)));
+        // Выводим информацию только если сидер вызван через artisan
+        if ($this->command) {
+            $this->command->info('Tenant роли и права созданы успешно!');
+            $this->command->info('Роли: ' . implode(', ', array_keys($roles)));
+        }
     }
 }

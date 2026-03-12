@@ -2,6 +2,7 @@
 
 namespace App\Services\Central;
 
+use App\Jobs\CreateDefaultBusinessForTenant;
 use App\Models\Central\Tenant;
 use App\Models\Central\Domain;
 use App\Models\Central\Subscription;
@@ -102,7 +103,11 @@ class TenantService
             if ($databaseCreated) {
                 // Запускаем миграции через Job
                 $migrateJob = new MigrateDatabase($tenant);
-                $migrateJob->handle($tenant);
+                $migrateJob->handle();
+                
+                // Создаем запись business по умолчанию
+                $createBusinessJob = new CreateDefaultBusinessForTenant($tenant);
+                $createBusinessJob->handle();
             } else {
                 // Создаем прямое подключение к tenant базе данных
                 $centralConnection = config('tenancy.database.central_connection', 'mysql');
@@ -133,7 +138,7 @@ class TenantService
                     }
                     
                     // Проверяем наличие основных таблиц tenant
-                    $requiredTables = ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'];
+                    $requiredTables = ['business', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'sessions'];
                     $missingTables = [];
                     foreach ($requiredTables as $requiredTable) {
                         if (!in_array($requiredTable, $tableNames)) {
@@ -143,7 +148,7 @@ class TenantService
                     
                     if (!empty($missingTables)) {
                         // Удаляем частично созданные таблицы, если они есть
-                        $partialTables = ['staff', 'locations', 'services', 'customers', 'bookings', 'service_staff', 'business', 'sessions', 'settings'];
+                        $partialTables = ['staff', 'business', 'services', 'customers', 'bookings', 'service_staff', 'sessions', 'settings'];
                         foreach ($partialTables as $table) {
                             try {
                                 $tenantConnection->statement("DROP TABLE IF EXISTS `{$table}`");
@@ -187,6 +192,9 @@ class TenantService
                         // Запускаем seeder для ролей и разрешений
                         $this->runTenantSeeder($tenantConnection);
                         
+                        // Создаем запись business по умолчанию
+                        $this->createDefaultBusiness($tenant, $tenantConnection);
+                        
                         // Проверяем снова после миграций
                         $tablesAfter = $tenantConnection->select("SHOW TABLES");
                         $tableCountAfter = count($tablesAfter);
@@ -221,6 +229,9 @@ class TenantService
                         // Запускаем seeder для ролей и разрешений
                         $this->runTenantSeeder($tenantConnection);
                         
+                        // Создаем запись business по умолчанию
+                        $this->createDefaultBusiness($tenant, $tenantConnection);
+                        
                         // Проверяем после миграций
                         $tablesAfter = $tenantConnection->select("SHOW TABLES");
                         $tableCountAfter = count($tablesAfter);
@@ -248,7 +259,7 @@ class TenantService
      * @param string $databaseName
      * @return bool
      */
-    protected function databaseExists(string $databaseName): bool
+    public function databaseExists(string $databaseName): bool
     {
         try {
             $connection = config('tenancy.database.central_connection', 'mysql');
@@ -308,7 +319,7 @@ class TenantService
                 'migrations_completed' => false,
                 'table_count' => 0,
                 'required_tables' => [],
-                'missing_tables' => ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'],
+                'missing_tables' => ['business', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'sessions'],
             ];
         }
         
@@ -331,7 +342,7 @@ class TenantService
             }
             
             // Проверяем наличие основных таблиц
-            $requiredTables = ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'];
+            $requiredTables = ['business', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'sessions'];
             $missingTables = [];
             foreach ($requiredTables as $requiredTable) {
                 if (!in_array($requiredTable, $tableNames)) {
@@ -352,7 +363,7 @@ class TenantService
                 'migrations_completed' => false,
                 'table_count' => 0,
                 'required_tables' => [],
-                'missing_tables' => ['locations', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'business', 'sessions'],
+                'missing_tables' => ['business', 'services', 'staff', 'customers', 'bookings', 'service_staff', 'sessions'],
                 'error' => $e->getMessage(),
             ];
         } finally {
@@ -395,6 +406,34 @@ class TenantService
     }
 
     /**
+     * Создать запись business по умолчанию для tenant
+     *
+     * @param Tenant $tenant
+     * @param \Illuminate\Database\Connection $connection
+     * @return void
+     */
+    protected function createDefaultBusiness(Tenant $tenant, $connection): void
+    {
+        try {
+            // Проверяем, не существует ли уже запись business
+            $businessCount = $connection->table('business')->count();
+            if ($businessCount > 0) {
+                return;
+            }
+
+            // Создаем запись business с названием тенанта
+            $connection->table('business')->insert([
+                'name' => $tenant->name,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } catch (\Exception $e) {
+            // Игнорируем ошибки создания business
+        }
+    }
+
+    /**
      * Удалить tenant и все связанные данные
      *
      * @param Tenant $tenant
@@ -402,20 +441,10 @@ class TenantService
      */
     public function deleteTenant(Tenant $tenant): bool
     {
-        // Пытаемся удалить базу данных tenant
-        try {
-            $databaseName = config('tenancy.database.prefix') . $tenant->id . config('tenancy.database.suffix');
-
-            // Менеджер БД tenancy отвечает за фактический DROP DATABASE
-            $tenant->database()->manager()->deleteDatabase($tenant);
-        } catch (\Throwable $e) {
-            // Игнорируем ошибки
-        }
-
         // Удаление всех доменов
         $tenant->domains()->delete();
 
-        // Удаление tenant (база данных будет удалена автоматически через события)
+        // Удаление tenant (база данных будет удалена автоматически через событие TenantDeleted -> DeleteDatabase job)
         return $tenant->delete();
     }
 }

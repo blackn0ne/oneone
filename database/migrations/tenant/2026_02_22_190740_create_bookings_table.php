@@ -11,13 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('bookings')) {
+            return;
+        }
+        
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
             $table->string('booking_number')->unique();
             $table->foreignId('service_id')->constrained('services')->cascadeOnDelete();
             $table->foreignId('staff_id')->nullable()->constrained('staff')->nullOnDelete();
             $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
+            $table->foreignId('business_id')->nullable()->constrained('business')->nullOnDelete();
             $table->enum('status', ['pending', 'confirmed', 'cancelled', 'completed', 'no_show'])->default('pending');
             $table->enum('booking_mode', ['service', 'hotel', 'event', 'online', 'rental', 'chauffeur'])->default('service');
             $table->timestamp('start_time');

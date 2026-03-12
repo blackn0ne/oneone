@@ -50,7 +50,8 @@ class HandleInertiaRequests extends Middleware
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'is_super_admin' => $user->is_super_admin ?? false,
+                'role' => $user->role ?? 'staff',
+                'is_super_admin' => $user->isSuperAdmin(),
                 'roles' => $user->roles->pluck('name')->toArray(),
             ];
         }

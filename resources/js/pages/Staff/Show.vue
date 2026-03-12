@@ -78,7 +78,7 @@ const props = defineProps<Props>();
                                 class="flex items-center justify-between border-b pb-2"
                             >
                                 <span>{{ service.name }}</span>
-                                <Badge variant="outline">{{ service.price }} ₽</Badge>
+                                <Badge variant="outline">{{ service.price }} ₸</Badge>
                             </div>
                         </div>
                         <p v-else class="text-muted-foreground">Нет назначенных услуг</p>

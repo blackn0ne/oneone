@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Service, Location } from '@/types';
+import type { Service, Business } from '@/types';
 import { route } from '@/lib/routes';
 
 interface Props {
     service: Service;
-    locations: Location[];
+    businesses: Business[];
 }
 
 const props = defineProps<Props>();
@@ -23,23 +23,17 @@ const form = useForm({
     description: props.service.description || '',
     duration: props.service.duration,
     price: props.service.price,
-    location_id: props.service.location_id ? String(props.service.location_id) : '',
+    business_id: props.service.business_id ? String(props.service.business_id) : '',
     is_active: props.service.is_active,
     booking_mode: props.service.booking_mode,
-    buffer_time_before: props.service.buffer_time_before || 0,
-    buffer_time_after: props.service.buffer_time_after || 0,
-    prepare_time: props.service.prepare_time || 0,
-    max_participants: props.service.max_participants,
-    allow_custom_duration: props.service.allow_custom_duration || false,
-    allow_recurring: props.service.allow_recurring || false,
 });
 
 const submit = () => {
     const submitData = { ...form.data() };
-    if (!submitData.location_id || submitData.location_id === '') {
-        submitData.location_id = null;
+    if (!submitData.business_id || submitData.business_id === '') {
+        submitData.business_id = null;
     } else {
-        submitData.location_id = Number(submitData.location_id);
+        submitData.business_id = Number(submitData.business_id);
     }
     form.transform(() => submitData).put(route('services.update', props.service.id));
 };
@@ -76,7 +70,7 @@ const submit = () => {
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="price">Цена (₽) *</Label>
+                                <Label for="price">Цена (₸) *</Label>
                                 <Input id="price" v-model.number="form.price" type="number" min="0" step="0.01" required />
                                 <p v-if="form.errors.price" class="text-sm text-destructive">
                                     {{ form.errors.price }}
@@ -113,19 +107,19 @@ const submit = () => {
                             </div>
 
                             <div class="space-y-2">
-                                <Label for="location">Локация</Label>
-                                <Select v-model="form.location_id">
-                                    <SelectTrigger id="location">
-                                        <SelectValue placeholder="Выберите локацию (опционально)" />
+                                <Label for="business">Точка продаж</Label>
+                                <Select v-model="form.business_id">
+                                    <SelectTrigger id="business">
+                                        <SelectValue placeholder="Выберите точку продаж (опционально)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Нет локации</SelectItem>
+                                        <SelectItem value="">Нет точки продаж</SelectItem>
                                         <SelectItem
-                                            v-for="location in locations"
-                                            :key="location.id"
-                                            :value="String(location.id)"
+                                            v-for="business in businesses"
+                                            :key="business.id"
+                                            :value="String(business.id)"
                                         >
-                                            {{ location.name }}
+                                            {{ business.name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -133,60 +127,9 @@ const submit = () => {
                         </div>
 
                         <div class="space-y-4">
-                            <Label class="text-base font-semibold">Временные интервалы</Label>
-                            <div class="grid gap-4 md:grid-cols-3">
-                                <div class="space-y-2">
-                                    <Label for="buffer_before">Буфер до начала (мин)</Label>
-                                    <Input id="buffer_before" v-model.number="form.buffer_time_before" type="number" min="0" />
-                                    <p class="text-xs text-muted-foreground">
-                                        Время, зарезервированное перед началом услуги (например, для подготовки оборудования)
-                                    </p>
-                                </div>
-
-                                <div class="space-y-2">
-                                    <Label for="buffer_after">Буфер после окончания (мин)</Label>
-                                    <Input id="buffer_after" v-model.number="form.buffer_time_after" type="number" min="0" />
-                                    <p class="text-xs text-muted-foreground">
-                                        Время, зарезервированное после окончания услуги (например, для уборки, перерыва)
-                                    </p>
-                                </div>
-
-                                <div class="space-y-2">
-                                    <Label for="prepare_time">Время подготовки (мин)</Label>
-                                    <Input id="prepare_time" v-model.number="form.prepare_time" type="number" min="0" />
-                                    <p class="text-xs text-muted-foreground">
-                                        Время, необходимое сотруднику для подготовки к услуге
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="space-y-2">
-                            <Label for="max_participants">Макс. участников</Label>
-                            <Input id="max_participants" v-model.number="form.max_participants" type="number" min="1" />
-                            <p class="text-xs text-muted-foreground">
-                                Оставьте пустым для индивидуальных услуг
-                            </p>
-                        </div>
-
-                        <div class="space-y-4">
                             <div class="flex items-center space-x-2">
-                                <Checkbox id="is_active" v-model:checked="form.is_active" />
+                                <Checkbox id="is_active" v-model="form.is_active" />
                                 <Label for="is_active" class="cursor-pointer">Активна</Label>
-                            </div>
-
-                            <div class="flex items-center space-x-2">
-                                <Checkbox id="allow_custom_duration" v-model:checked="form.allow_custom_duration" />
-                                <Label for="allow_custom_duration" class="cursor-pointer">
-                                    Разрешить кастомную длительность
-                                </Label>
-                            </div>
-
-                            <div class="flex items-center space-x-2">
-                                <Checkbox id="allow_recurring" v-model:checked="form.allow_recurring" />
-                                <Label for="allow_recurring" class="cursor-pointer">
-                                    Разрешить повторяющиеся бронирования
-                                </Label>
                             </div>
                         </div>
                     </CardContent>

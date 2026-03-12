@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,12 +13,12 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { PlusIcon } from 'lucide-vue-next';
+import { PlusIcon, Eye, Pencil, Trash2 } from 'lucide-vue-next';
 import StaffCreateForm from '@/components/Forms/StaffCreateForm.vue';
 import type { Staff } from '@/types';
 import { route } from '@/lib/routes';
 
-interface Permission {
+interface Role {
     id: number;
     name: string;
 }
@@ -30,7 +30,7 @@ interface Props {
         current_page: number;
         last_page: number;
     };
-    permissions?: Record<string, Permission[]>;
+    roles?: Role[];
 }
 
 const props = defineProps<Props>();
@@ -49,6 +49,12 @@ const closeCreateSheet = (open: boolean) => {
 
 const handleSuccess = () => {
     isCreateSheetOpen.value = false;
+};
+
+const handleDelete = (staffMember: Staff) => {
+    if (confirm('Вы уверены, что хотите удалить этого сотрудника?')) {
+        router.delete(route('staff.destroy', staffMember.id));
+    }
 };
 </script>
 
@@ -101,9 +107,26 @@ const handleSuccess = () => {
                                     </Badge>
                                 </TableCell>
                                 <TableCell class="text-right">
-                                    <Link :href="route('staff.show', member.id)">
-                                        <Button variant="ghost" size="sm">Просмотр</Button>
-                                    </Link>
+                                    <div class="flex justify-end gap-2">
+                                        <Link :href="route('staff.show', member.id)">
+                                            <Button variant="ghost" size="icon" class="rounded-full">
+                                                <Eye class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                        <Link :href="route('staff.edit', member.id)">
+                                            <Button variant="ghost" size="icon" class="rounded-full">
+                                                <Pencil class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="rounded-full"
+                                            @click="handleDelete(member)"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                             <TableRow v-if="staff.data.length === 0">
@@ -128,7 +151,7 @@ const handleSuccess = () => {
 
                     <div class="mt-6">
                         <StaffCreateForm
-                            :permissions="props.permissions || {}"
+                            :roles="props.roles || []"
                             :on-success="handleSuccess"
                             :on-cancel="() => closeCreateSheet(false)"
                         />

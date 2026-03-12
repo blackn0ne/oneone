@@ -97,7 +97,7 @@ const formatDate = (date: string) => {
                                     <Badge :variant="booking.status === 'confirmed' ? 'default' : 'secondary'">
                                         {{ booking.status }}
                                     </Badge>
-                                    <p class="text-sm mt-1">{{ booking.total_price }} ₽</p>
+                                    <p class="text-sm mt-1">{{ booking.total_price }} ₸</p>
                                 </div>
                             </div>
                         </div>

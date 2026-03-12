@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { Button } from '@/components/ui/button';
@@ -8,59 +8,174 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SheetFooter, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { SheetFooter } from '@/components/ui/sheet';
 import BookingCalendar from '@/components/booking/BookingCalendar.vue';
-import type { Service, Staff } from '@/types';
+import type { Service, Staff, Booking } from '@/types';
 import { route } from '@/lib/routes';
 
 interface Props {
     services?: Service[];
     staff?: Staff[];
+    booking?: Booking;
+    workingHours?: {
+        [key: string]: {
+            is_closed: boolean;
+            start: string;
+            end: string;
+        };
+    };
     onSuccess?: () => void;
     onCancel?: () => void;
 }
 
 const props = defineProps<Props>();
 
+const isEditMode = computed(() => !!props.booking);
+
 const form = useForm({
-    service_id: '',
-    staff_id: '',
-    customer_name: '',
-    customer_phone: '',
-    business_id: '',
-    start_time: '',
-    end_time: '',
-    duration: null as number | null,
-    participants_count: 1,
-    is_group: false,
-    is_recurring: false,
-    recurring_pattern: 'weekly',
-    recurring_end_date: '',
-    notes: '',
+    service_id: props.booking?.service_id ? String(props.booking.service_id) : '',
+    staff_id: props.booking?.staff_id ? String(props.booking.staff_id) : '',
+    customer_name: props.booking?.customer?.name || '',
+    customer_phone: props.booking?.customer?.phone || '',
+    business_id: props.booking?.business_id ? String(props.booking.business_id) : '',
+    status: (props.booking?.status || 'pending') as 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show',
+    start_time: props.booking?.start_time || '',
+    end_time: props.booking?.end_time || '',
+    duration: props.booking?.duration || null as number | null,
+    participants_count: props.booking?.participants_count || 1,
+    is_group: props.booking?.is_group || false,
+    is_recurring: props.booking?.is_recurring || false,
+    recurring_pattern: props.booking?.recurring_pattern || 'weekly',
+    recurring_end_date: props.booking?.recurring_end_date || '',
+    notes: props.booking?.notes || '',
 });
+
+// Инициализация даты и времени из существующего бронирования
+const initializeDateTime = () => {
+    if (props.booking?.start_time) {
+        const startDate = new Date(props.booking.start_time);
+        selectedDate.value = startDate;
+        
+        const hours = String(startDate.getHours()).padStart(2, '0');
+        const minutes = String(startDate.getMinutes()).padStart(2, '0');
+        selectedTime.value = `${hours}:${minutes}`;
+        
+        // Устанавливаем длительность если есть
+        if (props.booking.duration && !form.duration) {
+            form.duration = props.booking.duration;
+        }
+    }
+};
 
 const selectedDate = ref<Date>();
 const selectedTime = ref('');
 const selectedService = ref<Service | null>(null);
 
-const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-    '18:00', '18:30', '19:00', '19:30', '20:00',
-];
+// Инициализация при монтировании
+initializeDateTime();
+
+// Инициализация услуги
+if (props.booking?.service_id) {
+    const service = (props.services || []).find(s => s.id === props.booking!.service_id);
+    if (service) {
+        selectedService.value = service;
+        if (!form.duration) {
+            form.duration = service.duration;
+        }
+    }
+}
+
+// Маппинг дней недели
+const dayMap: Record<number, string> = {
+    0: 'sunday',    // Воскресенье
+    1: 'monday',    // Понедельник
+    2: 'tuesday',   // Вторник
+    3: 'wednesday', // Среда
+    4: 'thursday',  // Четверг
+    5: 'friday',    // Пятница
+    6: 'saturday',  // Суббота
+};
+
+// Генерация временных слотов на основе рабочих часов и длительности услуги
+const timeSlots = computed(() => {
+    // Если нет выбранной даты или услуги, возвращаем пустой массив
+    if (!selectedDate.value || !selectedService.value || !form.duration) {
+        return [];
+    }
+    
+    // Получаем день недели (0 = воскресенье, 1 = понедельник, и т.д.)
+    const dayOfWeek = selectedDate.value.getDay();
+    const dayKey = dayMap[dayOfWeek];
+    
+    // Получаем рабочие часы для выбранного дня
+    if (!props.workingHours || !props.workingHours[dayKey]) {
+        // Если нет рабочих часов, используем дефолтные 8:00-22:00
+        return generateTimeSlots('08:00', '22:00', form.duration);
+    }
+    
+    const dayHours = props.workingHours[dayKey];
+    
+    // Если день выходной, возвращаем пустой массив
+    if (dayHours.is_closed) {
+        return [];
+    }
+    
+    // Генерируем слоты на основе рабочих часов и длительности
+    return generateTimeSlots(dayHours.start, dayHours.end, form.duration);
+});
+
+// Функция генерации временных слотов
+function generateTimeSlots(startTime: string, endTime: string, duration: number): string[] {
+    const slots: string[] = [];
+    
+    // Парсим время начала и конца
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    
+    // Создаем Date объекты для удобной работы
+    const start = new Date();
+    start.setHours(startHour, startMinute, 0, 0);
+    
+    const end = new Date();
+    end.setHours(endHour, endMinute, 0, 0);
+    
+    // Генерируем слоты с интервалом 30 минут
+    const current = new Date(start);
+    const slotDuration = duration; // длительность в минутах
+    
+    while (current < end) {
+        // Проверяем, что слот + длительность не выходит за рабочие часы
+        const slotEnd = new Date(current);
+        slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration);
+        
+        if (slotEnd <= end) {
+            const hours = String(current.getHours()).padStart(2, '0');
+            const minutes = String(current.getMinutes()).padStart(2, '0');
+            slots.push(`${hours}:${minutes}`);
+        }
+        
+        // Переходим к следующему слоту (каждые 30 минут)
+        current.setMinutes(current.getMinutes() + 30);
+    }
+    
+    return slots;
+}
 
 const onServiceChange = (serviceId: AcceptableValue) => {
     if (!serviceId || typeof serviceId !== 'string') {
         form.service_id = '';
         selectedService.value = null;
+        form.duration = null;
+        selectedTime.value = '';
         return;
     }
     form.service_id = serviceId;
     const service = (props.services || []).find(s => s.id === Number(serviceId));
     selectedService.value = service || null;
-    if (service && !form.duration) {
+    if (service) {
         form.duration = service.duration;
+        // Сбрасываем выбранное время при смене услуги
+        selectedTime.value = '';
     }
 };
 
@@ -95,36 +210,40 @@ const updateDateTime = () => {
 };
 
 const submit = () => {
-    form.post(route('bookings.store'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            form.reset();
-            form.customer_name = '';
-            form.customer_phone = '';
-            selectedDate.value = undefined;
-            selectedTime.value = '';
-            selectedService.value = null;
-            props.onSuccess?.();
-        },
-    });
+    if (isEditMode.value && props.booking) {
+        // Режим редактирования
+        form.put(route('bookings.update', props.booking.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                props.onSuccess?.();
+            },
+        });
+    } else {
+        // Режим создания
+        form.post(route('bookings.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                form.customer_name = '';
+                form.customer_phone = '';
+                selectedDate.value = undefined;
+                selectedTime.value = '';
+                selectedService.value = null;
+                props.onSuccess?.();
+            },
+        });
+    }
 };
 </script>
 
 <template>
-    <SheetHeader>
-        <SheetTitle>Создать бронирование</SheetTitle>
-        <SheetDescription>
-            Заполните форму для создания нового бронирования
-        </SheetDescription>
-    </SheetHeader>
     
-    <form @submit.prevent="submit" class="space-y-6">
+    
+    <form @submit.prevent="submit" class="flex flex-col space-y-6 h-full">
         <!-- Основная информация -->
-        <div class="space-y-4">
-            <h3 class="text-lg font-semibold">Основная информация</h3>
-            
+        <div class="px-4">
             <!-- Услуга и Сотрудник -->
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-4">
                 <div class="space-y-2">
                     <Label for="service">Услуга *</Label>
                     <Select
@@ -142,7 +261,7 @@ const submit = () => {
                                 :key="service.id"
                                 :value="String(service.id)"
                             >
-                                {{ service.name }} - {{ service.price }} ₽
+                                {{ service.name }} - {{ service.price }} ₸
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -171,14 +290,7 @@ const submit = () => {
                         </SelectContent>
                     </Select>
                 </div>
-            </div>
-        </div>
-
-        <!-- Информация о клиенте -->
-        <div class="space-y-4">
-            <h3 class="text-lg font-semibold">Информация о клиенте</h3>
             
-            <div class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-2">
                     <Label for="customer_name">Имя клиента *</Label>
                     <Input
@@ -207,69 +319,88 @@ const submit = () => {
                         {{ form.errors.customer_phone }}
                     </p>
                 </div>
-            </div>
-        </div>
 
-        <!-- Дата и время -->
-        <div class="space-y-4">
-            <h3 class="text-lg font-semibold">Дата и время</h3>
-            
-            <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-2">
-                    <Label>Дата *</Label>
-                    <div class="w-full">
-                        <BookingCalendar v-model:date="selectedDate" @update:date="onDateChange" />
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <Label>Дата *</Label>
+                        <div class="w-full">
+                            <BookingCalendar :date="selectedDate" @update:date="onDateChange" />
+                        </div>
+                        <p v-if="form.errors.start_time" class="text-sm text-destructive mt-1">
+                            {{ form.errors.start_time }}
+                        </p>
                     </div>
-                    <p v-if="form.errors.start_time" class="text-sm text-destructive mt-1">
-                        {{ form.errors.start_time }}
-                    </p>
+
+                    <div class="space-y-2">
+                        <Label for="time">Время *</Label>
+                        <Select
+                            id="time"
+                            v-model="selectedTime"
+                            @update:model-value="onTimeChange"
+                            required
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="Выберите время" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="slot in timeSlots"
+                                    :key="slot"
+                                    :value="slot"
+                                >
+                                    {{ slot }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="form.errors.start_time" class="text-sm text-destructive mt-1">
+                            {{ form.errors.start_time }}
+                        </p>
+                    </div>
                 </div>
 
                 <div class="space-y-2">
-                    <Label for="time">Время *</Label>
+                    <Label for="status">Статус *</Label>
                     <Select
-                        id="time"
-                        v-model="selectedTime"
-                        @update:model-value="onTimeChange"
+                        id="status"
+                        v-model="form.status"
                         required
                     >
                         <SelectTrigger class="w-full">
-                            <SelectValue placeholder="Выберите время" />
+                            <SelectValue placeholder="Выберите статус" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem
-                                v-for="slot in timeSlots"
-                                :key="slot"
-                                :value="slot"
-                            >
-                                {{ slot }}
-                            </SelectItem>
+                            <SelectItem value="pending">Ожидает</SelectItem>
+                            <SelectItem value="confirmed">Подтверждено</SelectItem>
+                            <SelectItem value="cancelled">Отменено</SelectItem>
+                            <SelectItem value="completed">Завершено</SelectItem>
+                            <SelectItem value="no_show">Не явился</SelectItem>
                         </SelectContent>
                     </Select>
-                    <p v-if="form.errors.start_time" class="text-sm text-destructive mt-1">
-                        {{ form.errors.start_time }}
+                    <p v-if="form.errors.status" class="text-sm text-destructive mt-1">
+                        {{ form.errors.status }}
                     </p>
+                </div>
+            
+                <div class="space-y-2">
+                    <Label for="notes">Примечания</Label>
+                    <Textarea
+                        id="notes"
+                        v-model="form.notes"
+                        placeholder="Дополнительная информация..."
+                        rows="3"
+                        class="w-full resize-none"
+                    />
                 </div>
             </div>
         </div>
 
-       
-        <!-- Примечания -->
-        <div class="space-y-2">
-            <Label for="notes">Примечания</Label>
-            <Textarea
-                id="notes"
-                v-model="form.notes"
-                placeholder="Дополнительная информация..."
-                rows="3"
-                class="w-full resize-none"
-            />
-        </div>
-
         <!-- Кнопки действий -->
-        <SheetFooter>
-            <Button type="submit" :disabled="form.processing">
-                {{ form.processing ? 'Создание...' : 'Создать бронирование' }}
+        <SheetFooter class="border-t p-4 mt-auto">
+            <Button type="submit" :disabled="form.processing" class="w-full">
+                {{ form.processing 
+                    ? (isEditMode ? 'Сохранение...' : 'Создание...') 
+                    : (isEditMode ? 'Сохранить изменения' : 'Создать бронирование') 
+                }}
             </Button>
         </SheetFooter>
     </form>

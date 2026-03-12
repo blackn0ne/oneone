@@ -29,7 +29,7 @@ class HomeController extends Controller
 
         // Суперадмин — редирект на central, кроме случая когда явно выбран tenant (set-tenant)
         $sessionTenantId = session(InitializeTenancyBySession::SESSION_KEY);
-        if ($user && ($user->is_super_admin || $user->hasRole('super_admin')) && !$sessionTenantId) {
+        if ($user && $user->isSuperAdmin() && !$sessionTenantId) {
             return redirect()->route('central.dashboard');
         }
 
@@ -71,13 +71,24 @@ class HomeController extends Controller
     {
         session()->put(InitializeTenancyBySession::SESSION_KEY, $tenant->id);
         session()->save(); // Явно сохраняем сессию
+        
+        // Инициализируем tenancy
         tenancy()->initialize($tenant);
-
-        try {
-            return $this->tenantDashboard->index(request());
-        } finally {
-            tenancy()->end();
-        }
+        
+        // Вызываем DashboardController - tenancy будет активен во время выполнения
+        // Завершение tenancy произойдет автоматически в конце запроса через middleware
+        // или через terminating callback
+        $response = $this->tenantDashboard->index(request());
+        
+        // Регистрируем завершение tenancy в конце запроса
+        // Это гарантирует, что подключение "tenant" будет активно до завершения ответа
+        app()->terminating(function () {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+        });
+        
+        return $response;
     }
 
     /**

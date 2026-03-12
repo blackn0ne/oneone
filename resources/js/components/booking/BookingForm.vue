@@ -95,7 +95,7 @@ const timeSlots = [
                                 :key="service.id"
                                 :value="String(service.id)"
                             >
-                                {{ service.name }} - {{ service.price }} ₽
+                                {{ service.name }} - {{ service.price }} ₸
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -209,7 +209,7 @@ const timeSlots = [
 
                 <!-- Повторяющееся бронирование -->
                 <div class="flex items-center space-x-2">
-                    <Checkbox id="recurring" v-model:checked="form.is_recurring" />
+                    <Checkbox id="recurring" v-model="form.is_recurring" />
                     <Label for="recurring" class="cursor-pointer">
                         Повторяющееся бронирование
                     </Label>

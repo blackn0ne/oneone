@@ -161,9 +161,10 @@ const submitWhatsApp = () => {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="USD">USD</SelectItem>
-                                                <SelectItem value="EUR">EUR</SelectItem>
-                                                <SelectItem value="RUB">RUB</SelectItem>
+                                                <SelectItem value="KZT">KZT (₸)</SelectItem>
+                                                <SelectItem value="USD">USD ($)</SelectItem>
+                                                <SelectItem value="EUR">EUR (€)</SelectItem>
+                                                <SelectItem value="RUB">RUB (₽)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -263,7 +264,7 @@ const submitWhatsApp = () => {
                                 <div class="flex items-center space-x-2">
                                     <Switch
                                         id="bank_transfer_enabled"
-                                        v-model:checked="paymentForm.bank_transfer_enabled"
+                                        v-model="paymentForm.bank_transfer_enabled"
                                     />
                                     <Label for="bank_transfer_enabled" class="cursor-pointer">
                                         {{ t('settings.payment.enable_bank_transfer', 'Включить банковский перевод') }}
@@ -441,7 +442,7 @@ const submitWhatsApp = () => {
                                 <div class="flex items-center space-x-2">
                                     <Switch
                                         id="whatsapp_enabled"
-                                        v-model:checked="whatsappForm.whatsapp_enabled"
+                                        v-model="whatsappForm.whatsapp_enabled"
                                     />
                                     <Label for="whatsapp_enabled" class="cursor-pointer">
                                         {{ t('settings.whatsapp.enable', 'Включить WhatsApp Business API') }}

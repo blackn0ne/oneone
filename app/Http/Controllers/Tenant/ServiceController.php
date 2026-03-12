@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant\Service;
-use App\Models\Tenant\Location;
+use App\Models\Tenant\Business;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,24 +17,15 @@ class ServiceController extends Controller
 {
     public function index(Request $request): Response
     {
-        $services = Service::with('location')
+        $services = Service::with('business')
             ->latest()
             ->paginate(15);
 
-        $locations = Location::where('is_active', true)->get();
+        $businesses = Business::where('is_active', true)->get();
 
         return Inertia::render('Services/Index', [
             'services' => $services,
-            'locations' => $locations,
-        ]);
-    }
-
-    public function create(Request $request): Response
-    {
-        $locations = Location::where('is_active', true)->get();
-
-        return Inertia::render('Services/Create', [
-            'locations' => $locations,
+            'businesses' => $businesses,
         ]);
     }
 
@@ -51,15 +42,9 @@ class ServiceController extends Controller
             'description' => ['nullable', 'string'],
             'duration' => ['required', 'integer', 'min:1'],
             'price' => ['required', 'numeric', 'min:0'],
-            'location_id' => ['nullable', 'exists:locations,id'],
+            'business_id' => ['nullable', 'exists:business,id'],
             'is_active' => ['boolean'],
             'booking_mode' => ['required', 'in:service,hotel,event,online,rental,chauffeur'],
-            'buffer_time_before' => ['nullable', 'integer', 'min:0'],
-            'buffer_time_after' => ['nullable', 'integer', 'min:0'],
-            'prepare_time' => ['nullable', 'integer', 'min:0'],
-            'max_participants' => ['nullable', 'integer', 'min:1'],
-            'allow_custom_duration' => ['boolean'],
-            'allow_recurring' => ['boolean'],
         ]);
 
         $service = Service::create($validated);
@@ -73,7 +58,7 @@ class ServiceController extends Controller
     {
         // Используем явный поиск по ID, так как route model binding может не работать
         // из-за того, что модель находится в tenant БД
-        $service = Service::with(['location', 'staff', 'bookings'])->findOrFail($id);
+        $service = Service::with(['business', 'staff', 'bookings'])->findOrFail($id);
 
         return Inertia::render('Services/Show', [
             'service' => $service,
@@ -90,11 +75,11 @@ class ServiceController extends Controller
     public function edit(Request $request, $id): Response
     {
         $service = Service::findOrFail($id);
-        $locations = Location::where('is_active', true)->get();
+        $businesses = Business::where('is_active', true)->get();
 
         return Inertia::render('Services/Edit', [
             'service' => $service,
-            'locations' => $locations,
+            'businesses' => $businesses,
         ]);
     }
 
@@ -114,20 +99,14 @@ class ServiceController extends Controller
             'description' => ['nullable', 'string'],
             'duration' => ['sometimes', 'required', 'integer', 'min:1'],
             'price' => ['sometimes', 'required', 'numeric', 'min:0'],
-            'location_id' => ['nullable', 'exists:locations,id'],
+            'business_id' => ['nullable', 'exists:business,id'],
             'is_active' => ['boolean'],
             'booking_mode' => ['sometimes', 'required', 'in:service,hotel,event,online,rental,chauffeur'],
-            'buffer_time_before' => ['nullable', 'integer', 'min:0'],
-            'buffer_time_after' => ['nullable', 'integer', 'min:0'],
-            'prepare_time' => ['nullable', 'integer', 'min:0'],
-            'max_participants' => ['nullable', 'integer', 'min:1'],
-            'allow_custom_duration' => ['boolean'],
-            'allow_recurring' => ['boolean'],
         ]);
 
-        // Обработка location_id: если пустая строка, устанавливаем null
-        if (isset($validated['location_id']) && $validated['location_id'] === '') {
-            $validated['location_id'] = null;
+        // Обработка business_id: если пустая строка, устанавливаем null
+        if (isset($validated['business_id']) && $validated['business_id'] === '') {
+            $validated['business_id'] = null;
         }
 
         $service->update($validated);

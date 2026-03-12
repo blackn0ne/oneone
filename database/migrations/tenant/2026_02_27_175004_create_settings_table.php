@@ -12,7 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         // Таблица с бизнес-настройками конкретного tenant
-        Schema::create('business', function (Blueprint $table) {
+        // Переименовываем в settings, чтобы избежать конфликта с таблицей business (точки продаж)
+        if (Schema::hasTable('settings')) {
+            return;
+        }
+        
+        Schema::create('settings', function (Blueprint $table) {
             $table->id();
             
             // Основная информация о компании
@@ -34,8 +39,6 @@ return new class extends Migration
             $table->string('city')->nullable();
             $table->string('address')->nullable();
             
-            // График работы
-            $table->json('working_hours')->nullable(); // можно хранить по дням недели
             
             // Ссылки на соцсети
             $table->json('social_links')->nullable(); // { facebook: '', instagram: '', ... }
@@ -74,6 +77,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('business');
+        Schema::dropIfExists('settings');
     }
 };

@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $service_id
  * @property int|null $staff_id
  * @property int $customer_id
- * @property int|null $location_id
+     * @property int|null $business_id
  * @property BookingStatus|string $status
  * @property string $booking_mode
  * @property \Carbon\Carbon $start_time
@@ -46,7 +46,7 @@ class Booking extends Model
         'service_id',
         'staff_id',
         'customer_id',
-        'location_id',
+        'business_id',
         'status',
         'booking_mode',
         'start_time',
@@ -97,9 +97,9 @@ class Booking extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function location(): BelongsTo
+    public function business(): BelongsTo
     {
-        return $this->belongsTo(Location::class);
+        return $this->belongsTo(Business::class, 'business_id');
     }
 
     public function parentBooking(): BelongsTo

@@ -114,7 +114,7 @@ const companyName = () => props.business?.company_name || 'Наша компан
                             {{ service.duration }} мин
                         </span>
                         <span class="font-medium">
-                            {{ service.price?.toLocaleString('ru-RU') }} ₽
+                            {{ service.price?.toLocaleString('ru-RU') }} ₸
                         </span>
                     </div>
                     <Link :href="`/set-tenant/${tenantId}?redirect=/bookings/create`" class="mt-4 block">

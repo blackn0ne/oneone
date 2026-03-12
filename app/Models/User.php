@@ -22,8 +22,9 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
-        'is_super_admin',
+        'role',
     ];
 
     /**
@@ -49,7 +50,6 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
-            'is_super_admin' => 'boolean',
         ];
     }
 
@@ -58,7 +58,23 @@ class User extends Authenticatable
      */
     public function isSuperAdmin(): bool
     {
-        return $this->is_super_admin || $this->hasRole('super_admin');
+        return $this->role === 'super_admin' || $this->hasRole('super_admin');
+    }
+
+    /**
+     * Проверка, является ли пользователь админом (для tenant)
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin' || $this->hasRole('admin');
+    }
+
+    /**
+     * Проверка, является ли пользователь обычным сотрудником
+     */
+    public function isStaff(): bool
+    {
+        return $this->role === 'staff';
     }
 
     /**
